@@ -1,0 +1,126 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+    darkMode: 'class',
+    content: [
+        "./index.html",
+        "./src/**/*.{js,ts,jsx,tsx}",
+    ],
+    theme: {
+        extend: {
+            colors: {
+                // ── PM Pocket Logo Palette ──
+                // Primary: Blue   #4285F4 (logo blue circle)
+                // Secondary: Gold #F5C518 (logo yellow circle)
+                // Tertiary: Red   #C8202F (logo red letter P)
+
+                "on-background":  "#e0e6f7",
+                "surface-container": "#1c1f2e",
+                "on-primary-fixed": "#00174d",
+                "on-tertiary-fixed": "#3b0008",
+                "on-tertiary": "#6b0012",
+                "on-primary-container": "#002ea6",
+                "error-container": "#93000a",
+                "tertiary": "#ff8f8f",
+                "surface-container-low": "#161824",
+                "primary-fixed": "#adc6ff",
+                "on-surface": "#e0e6f7",
+                "on-secondary-fixed": "#2a1a00",
+                "surface-container-highest": "#2e3148",
+                "on-tertiary-container": "#7a0016",
+                "surface-container-high": "#232638",
+                "tertiary-container": "#e05a60",
+                "surface-tint": "#4285F4",
+                "outline-variant": "#3a3d56",
+                "on-primary": "#00174d",
+                "error": "#ffb4ab",
+                "surface-bright": "#32354e",
+                "surface-dim": "#0d0f1c",
+                "secondary-container": "#c9960a",
+                "inverse-on-surface": "#2a2d40",
+                "on-secondary-fixed-variant": "#6b4400",
+                "primary-fixed-dim": "#6fa3f8",
+                "surface-variant": "#2e3148",
+                "on-error-container": "#ffdad6",
+                "on-secondary-container": "#4a2f00",
+                "inverse-primary": "#1a56c4",
+                "secondary": "#F5C518",
+                "background": "#0d0f1c",
+                "surface": "#0d0f1c",
+                "surface-container-lowest": "#08090f",
+                "secondary-fixed-dim": "#F5C518",
+                "primary-container": "#1a56c4",
+                "inverse-surface": "#e0e6f7",
+                "tertiary-fixed-dim": "#ff8f8f",
+                "primary": "#4285F4",
+                "outline": "#8891b8",
+                "on-secondary": "#2a1a00",
+                "on-error": "#690005",
+                "on-primary-fixed-variant": "#1a4ec4",
+                "on-surface-variant": "#b0b8d8",
+                "on-tertiary-fixed-variant": "#8a1020",
+                "secondary-fixed": "#ffeab0",
+                "tertiary-fixed": "#ffd8d8",
+
+                // Legacy bank colors
+                'mercantil': '#FDB913',
+                'provincial': '#0033A0',
+                'banesco': '#FF6B00',
+                'venezuela': '#ED1C24',
+                'bod': '#003DA5',
+                'tesoro': '#00A859',
+                'bicentenario': '#1D4F91',
+                'bancaribe': '#003DA5',
+            },
+            borderRadius: {
+                "DEFAULT": "4px",
+                "lg": "8px",
+                "xl": "12px",
+                "2xl": "16px",
+                "3xl": "24px",
+                "full": "9999px"
+            },
+            spacing: {
+                "unit": "4px",
+                "margin-safe": "20px",
+                "xl": "32px",
+                "xs": "4px",
+                "md": "16px",
+                "sm": "8px",
+                "gutter": "16px",
+                "lg": "24px"
+            },
+            fontFamily: {
+                'sans': ['Inter', 'system-ui', 'sans-serif'],
+                "body-sm": ["Inter"],
+                "label-caps": ["Inter"],
+                "h2": ["Inter"],
+                "h3": ["Inter"],
+                "h1": ["Inter"],
+                "numeral-display": ["Inter"],
+                "body-lg": ["Inter"],
+                "body-md": ["Inter"]
+            },
+            fontSize: {
+                "body-sm": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                "label-caps": ["12px", { "lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                "h2": ["24px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                "h3": ["20px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                "h1": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                "numeral-display": ["40px", { "lineHeight": "1.0", "letterSpacing": "-0.04em", "fontWeight": "700" }],
+                "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }]
+            },
+            animation: {
+                'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
+                'flip-in': 'flipIn 0.6s ease-out forwards',
+                'pulse-card': 'pulse 2s ease-in-out infinite',
+                'slide-down': 'slideDown 0.4s ease-out forwards',
+                'gentle-float': 'gentleFloat 3s ease-in-out infinite',
+            },
+        },
+    },
+    plugins: [
+        require('@tailwindcss/forms'),
+        require('@tailwindcss/container-queries'),
+    ],
+}

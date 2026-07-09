@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>Pago Móvil Pocket - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#dde4dd",
+                    "surface-container": "#1a211d",
+                    "on-primary-fixed": "#002113",
+                    "on-tertiary-fixed": "#410005",
+                    "on-tertiary": "#650911",
+                    "on-primary-container": "#00422b",
+                    "error-container": "#93000a",
+                    "tertiary": "#ffb3af",
+                    "surface-container-low": "#161d19",
+                    "primary-fixed": "#6ffbbe",
+                    "on-surface": "#dde4dd",
+                    "on-secondary-fixed": "#2a1700",
+                    "surface-container-highest": "#2f3632",
+                    "on-tertiary-container": "#711419",
+                    "surface-container-high": "#242c27",
+                    "tertiary-container": "#fc7c78",
+                    "surface-tint": "#4edea3",
+                    "outline-variant": "#3c4a42",
+                    "on-primary": "#003824",
+                    "error": "#ffb4ab",
+                    "surface-bright": "#343b36",
+                    "surface-dim": "#0e1511",
+                    "secondary-container": "#ee9800",
+                    "inverse-on-surface": "#2b322d",
+                    "on-secondary-fixed-variant": "#653e00",
+                    "primary-fixed-dim": "#4edea3",
+                    "surface-variant": "#2f3632",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary-container": "#5b3800",
+                    "inverse-primary": "#006c49",
+                    "secondary": "#ffb95f",
+                    "background": "#0e1511",
+                    "surface": "#0e1511",
+                    "surface-container-lowest": "#09100c",
+                    "secondary-fixed-dim": "#ffb95f",
+                    "primary-container": "#10b981",
+                    "inverse-surface": "#dde4dd",
+                    "tertiary-fixed-dim": "#ffb3af",
+                    "primary": "#4edea3",
+                    "outline": "#86948a",
+                    "on-secondary": "#472a00",
+                    "on-error": "#690005",
+                    "on-primary-fixed-variant": "#005236",
+                    "on-surface-variant": "#bbcabf",
+                    "on-tertiary-fixed-variant": "#842225",
+                    "secondary-fixed": "#ffddb8",
+                    "tertiary-fixed": "#ffdad7"
+            },
+            "borderRadius": {
+                    "DEFAULT": "4px",
+                    "lg": "8px",
+                    "xl": "12px",
+                    "2xl": "16px",
+                    "3xl": "24px",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "margin-safe": "20px",
+                    "xl": "32px",
+                    "xs": "4px",
+                    "md": "16px",
+                    "sm": "8px",
+                    "gutter": "16px",
+                    "lg": "24px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "h2": ["Inter"],
+                    "h3": ["Inter"],
+                    "h1": ["Inter"],
+                    "numeral-display": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "h2": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "h3": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "h1": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "numeral-display": ["40px", {"lineHeight": "1.0", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #0D0F12;
+            color: #dde4dd;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-surface {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-surface-active {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md overflow-x-hidden">
+<!-- TOP APP BAR -->
+<header class="bg-[#0D0F12]/60 backdrop-blur-md border-b border-white/5 docked full-width top-0 flex justify-between items-center w-full px-5 py-3 h-16 sticky z-50">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center transition-all duration-200 active:scale-95">
+<span class="material-symbols-outlined text-white" data-icon="wallet">wallet</span>
+</div>
+<div>
+<h1 class="text-white text-lg font-bold font-['Inter'] tracking-tight">Pago Móvil Pocket</h1>
+<p class="text-[10px] text-slate-400 font-medium tracking-wide">v0.1.0 BETA</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 text-slate-400 transition-all duration-200 active:scale-95">
+<span class="material-symbols-outlined" data-icon="settings_brightness">settings_brightness</span>
+</button>
+</div>
+</header>
+<main class="px-margin-safe py-lg space-y-lg pb-32">
+<!-- INTRO -->
+<section class="mb-4">
+<h2 class="text-white font-h2 text-h2">Dashboard</h2>
+<p class="text-on-surface-variant font-body-sm text-body-sm">Gestiona tus cuentas de forma simple</p>
+</section>
+<!-- CURRENCY CALCULATOR CARD -->
+<article class="glass-surface rounded-2xl p-md flex flex-col gap-md">
+<!-- Card Header -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="calculate" style="font-variation-settings: 'FILL' 1;">calculate</span>
+</div>
+<div>
+<h3 class="text-white font-h3 text-h3 leading-none">Calculadora</h3>
+<p class="text-[12px] text-slate-500">Conversor de divisas</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1.5 bg-primary/10 px-2 py-1 rounded-full">
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+<span class="text-[10px] font-bold text-primary uppercase tracking-wider">Online</span>
+</div>
+<button class="text-slate-500 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-md" data-icon="refresh">refresh</span>
+</button>
+</div>
+</div>
+<!-- Mode Toggle -->
+<div class="grid grid-cols-2 bg-white/5 p-1 rounded-xl">
+<button class="py-2 text-[13px] font-semibold rounded-lg bg-gradient-to-r from-primary to-primary/80 text-on-primary-fixed shadow-lg transition-all">Tasa en vivo</button>
+<button class="py-2 text-[13px] font-semibold rounded-lg text-slate-400 hover:text-white transition-all">Tasa manual</button>
+</div>
+<!-- Currency Pills -->
+<div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+<button class="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full border border-primary bg-primary/5 shadow-[0_0_12px_rgba(78,222,163,0.15)]">
+<span class="text-lg">🇺🇸</span>
+<span class="text-[12px] font-bold text-white">Dólar BCV</span>
+</button>
+<button class="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full glass-surface">
+<span class="text-lg">🇪��</span>
+<span class="text-[12px] font-bold text-slate-400">Euro</span>
+</button>
+<button class="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full glass-surface">
+<span class="text-lg">🟢</span>
+<span class="text-[12px] font-bold text-slate-400">Paralelo</span>
+</button>
+</div>
+<!-- Rate Display -->
+<div class="flex justify-between items-center bg-white/5 border border-white/5 rounded-2xl p-4">
+<div class="space-y-1">
+<div class="flex gap-1 overflow-hidden">
+<span class="px-2 py-0.5 rounded-md bg-primary text-on-primary-fixed text-[10px] font-extrabold uppercase">Hoy (Sáb, 03 May)</span>
+<span class="px-2 py-0.5 rounded-md bg-white/5 text-slate-500 text-[10px] font-bold">Mañana</span>
+</div>
+<p class="text-primary font-numeral-display text-h2 pt-1">1 USD = 487,12 Bs.</p>
+</div>
+<div class="text-right">
+<span class="material-symbols-outlined text-slate-600 text-3xl" data-icon="trending_up">trending_up</span>
+</div>
+</div>
+<!-- Rate Comparison -->
+<div class="grid grid-cols-2 gap-3">
+<div class="glass-surface p-3 rounded-xl border-l-2 border-l-primary/40">
+<p class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">BCV Oficial</p>
+<p class="text-white font-bold text-sm">Bs. 487,12</p>
+</div>
+<div class="glass-surface p-3 rounded-xl border-l-2 border-l-amber-500/40">
+<p class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Paralelo</p>
+<p class="text-white font-bold text-sm">Bs. 631,55</p>
+</div>
+</div>
+<!-- Converter Engine -->
+<div class="space-y-4 relative py-2">
+<div class="space-y-1.5">
+<label class="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Monto en USD</label>
+<div class="glass-surface-active rounded-xl flex items-center px-4 h-14 border-white/10">
+<span class="text-primary font-bold mr-3">$</span>
+<input class="bg-transparent border-none focus:ring-0 text-white font-h2 text-h2 p-0 w-full placeholder:text-slate-700" placeholder="0,00" type="text"/>
+</div>
+</div>
+<!-- Swap Button -->
+<div class="absolute left-1/2 -translate-x-1/2 top-[50%] -translate-y-[50%] z-10">
+<button class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary-fixed flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-transform">
+<span class="material-symbols-outlined font-bold" data-icon="swap_vert">swap_vert</span>
+</button>
+</div>
+<div class="space-y-1.5 pt-2">
+<label class="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Resultado en VES</label>
+<div class="glass-surface rounded-xl flex items-center justify-between px-4 h-20 border-primary/20">
+<p class="text-primary font-numeral-display text-h1">Bs. 4.871,20</p>
+<button class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white">
+<span class="material-symbols-outlined text-sm" data-icon="content_copy">content_copy</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Mini History -->
+<div class="space-y-3 pt-2">
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-500 text-sm" data-icon="history">history</span>
+<h4 class="text-[12px] font-bold text-white">Últimas conversiones</h4>
+</div>
+<span class="bg-white/10 text-slate-400 text-[10px] px-1.5 py-0.5 rounded font-bold">3</span>
+</div>
+<div class="space-y-2">
+<div class="glass-surface p-3 rounded-xl flex items-center justify-between text-xs transition-all hover:bg-white/5 cursor-pointer">
+<span class="text-slate-500 font-medium">14:32</span>
+<span class="text-white font-semibold">10,00 USD <span class="text-primary mx-1">→</span> 4.871,20 Bs.</span>
+</div>
+<div class="glass-surface p-3 rounded-xl flex items-center justify-between text-xs opacity-70">
+<span class="text-slate-500 font-medium">12:15</span>
+<span class="text-white font-semibold">5,00 USD <span class="text-primary mx-1">→</span> 2.435,60 Bs.</span>
+</div>
+<div class="glass-surface p-3 rounded-xl flex items-center justify-between text-xs opacity-50">
+<span class="text-slate-500 font-medium">09:40</span>
+<span class="text-white font-semibold">100,00 USD <span class="text-primary mx-1">→</span> 48.712,00 Bs.</span>
+</div>
+</div>
+</div>
+</article>
+<!-- EMPTY STATE CARD -->
+<section class="glass-surface rounded-2xl p-xl flex flex-col items-center text-center gap-md">
+<div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-xl shadow-primary/10">
+<span class="material-symbols-outlined text-white text-4xl" data-icon="add" data-weight="fill" style="font-variation-settings: 'FILL' 1;">add</span>
+</div>
+<div class="space-y-2">
+<h3 class="text-white font-h2 text-h2">Comienza ahora</h3>
+<p class="text-slate-400 font-body-sm text-body-sm max-w-[240px] mx-auto">Agrega tu primera cuenta para empezar a gestionar tus pagos de forma rápida y segura.</p>
+</div>
+<button class="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-primary-container text-on-primary-fixed font-bold text-body-md shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform">
+                Agregar Primera Cuenta
+            </button>
+<div class="flex gap-4">
+<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+<span class="material-symbols-outlined text-primary text-[14px]" data-icon="verified_user">verified_user</span>
+<span class="text-[11px] font-bold text-slate-300">Seguro</span>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+<span class="material-symbols-outlined text-amber-500 text-[14px]" data-icon="lock">lock</span>
+<span class="text-[11px] font-bold text-slate-300">Privado</span>
+</div>
+</div>
+</section>
+<!-- FOOTER -->
+<footer class="flex flex-col items-center gap-4 w-full px-5 pb-12 text-center mt-xl border-t border-white/5 pt-8">
+<div class="space-y-1">
+<p class="font-body-sm text-slate-500 text-xs">Diseñado y desarrollado por <span class="text-primary font-bold">ARTKING47</span></p>
+<p class="font-body-sm text-slate-600 text-[10px]">© 2024 Pago Móvil Pocket. Secure Transaction Data.</p>
+</div>
+<div class="flex items-center gap-1.5 bg-primary/5 px-2.5 py-1 rounded-full border border-primary/20">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest">Seguro</span>
+</div>
+</footer>
+</main>
+<!-- BOTTOM NAVBAR -->
+<nav class="bg-[#0D0F12]/80 backdrop-blur-xl border-t border-white/5 rounded-t-2xl fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 h-20 pb-safe">
+<div class="flex flex-col items-center justify-center text-emerald-400 after:content-[''] after:w-1 after:h-1 after:bg-amber-400 after:rounded-full after:mt-1 transition-transform active:scale-90">
+<span class="material-symbols-outlined" data-icon="calculate" style="font-variation-settings: 'FILL' 1;">calculate</span>
+<span class="font-['Inter'] text-[10px] font-medium">Calculator</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-300 transition-transform active:scale-90">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-['Inter'] text-[10px] font-medium">Accounts</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-300 transition-transform active:scale-90">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-['Inter'] text-[10px] font-medium">History</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-300 transition-transform active:scale-90">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-['Inter'] text-[10px] font-medium">Profile</span>
+</div>
+</nav>
+<!-- Visual Polish: Content Spacer for Bottom Nav -->
+<div class="h-20 w-full"></div>
+</body></html>

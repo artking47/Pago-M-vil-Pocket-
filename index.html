@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es" class="dark" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/isotipo-splash.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0d0f1c" />
+  <meta name="description" content="Gestiona tus datos de Pago Móvil de forma simple y rápida — por ARTKING47" />
+  <meta name="author" content="ARTKING47" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PM Pocket" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/isotipo-splash.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet">
+  </noscript>
+  <title>Pago Móvil Pocket</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://bcv-api.rafnixg.dev https://open.er-api.com https://ve.dolarapi.com https://fonts.googleapis.com https://fonts.gstatic.com">
+  <!-- Splash screen nativo: fondo negro inmediato para evitar flash blanco -->
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    #root {
+      min-height: 100vh;
+    }
+
+    .pre-splash {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #0d0f1c;
+    }
+
+    @media (prefers-color-scheme: light) {
+      .pre-splash {
+        background: #f0f4ff;
+      }
+    }
+
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root">
+    <div class="pre-splash">
+      <img src="/isotipo-splash.png" alt="" width="120" height="120" style="object-fit:contain;opacity:0.8;" />
+    </div>
+  </div>
+  <script type="module" src="/src/main.jsx"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => console.log('SW registrado'))
+          .catch(err => console.log('Error SW:', err));
+      });
+    }
+    window.addEventListener('beforeunload', (e) => {
+      if (localStorage.getItem('pago_movil_data')) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  </script>
+</body>
+
+</html>
