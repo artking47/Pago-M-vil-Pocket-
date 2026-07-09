@@ -1,28 +1,15 @@
 async function fetchBCVRate() {
     try {
-        const url = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.bcv.org.ve/');
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Proxy failed');
+        const response = await fetch('https://rates.dolarvzla.com/bcv/current.json');
+        if (!response.ok) throw new Error('DolarVZLA API failed');
         
         const data = await response.json();
-        const html = data.contents;
-        if (!html) throw new Error('Empty contents');
-        
-        const rateMatch = html.match(/<div id="dolar".*?>.*?<strong>\s*(.*?)\s*<\/strong>/s);
-        const dateMatch = html.match(/<span[^>]*class="date-display-single"[^>]*content="(.*?)"/);
-        
-        let rate = 0;
-        let date = new Date().toISOString().split('T')[0];
-
-        if (rateMatch && rateMatch[1]) {
-            rate = parseFloat(rateMatch[1].replace(',', '.'));
-        }
-        if (dateMatch && dateMatch[1]) {
-            date = dateMatch[1].split('T')[0];
-        }
-        return { rate, date };
+        return {
+            rate: data.current.usd,
+            date: data.current.date
+        };
     } catch (e) {
-        console.error("BCV Fetch Error (Proxy):", e);
+        console.error("BCV Fetch Error (DolarVZLA):", e);
         return { rate: 0, date: new Date().toISOString().split('T')[0] };
     }
 }
