@@ -1,27 +1,33 @@
-// netlify/functions/rates.js
-async function fetchBCVRate() {
-    try {
-        const response = await fetch('https://www.bcv.org.ve/', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-        });
-        const html = await response.text();
-        const rateMatch = html.match(/<div id="dolar".*?>.*?<strong>\s*(.*?)\s*<\/strong>/s);
-        const dateMatch = html.match(/<span[^>]*class="date-display-single"[^>]*content="(.*?)"/);
-        
-        let rate = 0;
-        let date = new Date().toISOString().split('T')[0];
+const https = require('https');
 
-        if (rateMatch && rateMatch[1]) {
-            rate = parseFloat(rateMatch[1].replace(',', '.'));
-        }
-        if (dateMatch && dateMatch[1]) {
-            date = dateMatch[1].split('T')[0];
-        }
-        return { rate, date };
-    } catch (e) {
-        console.error("BCV Fetch Error:", e);
-        return { rate: 0, date: new Date().toISOString().split('T')[0] };
-    }
+async function fetchBCVRate() {
+    return new Promise((resolve) => {
+        https.get('https://www.bcv.org.ve/', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+            rejectUnauthorized: false
+        }, (res) => {
+            let html = '';
+            res.on('data', chunk => html += chunk);
+            res.on('end', () => {
+                const rateMatch = html.match(/<div id="dolar".*?>.*?<strong>\s*(.*?)\s*<\/strong>/s);
+                const dateMatch = html.match(/<span[^>]*class="date-display-single"[^>]*content="(.*?)"/);
+                
+                let rate = 0;
+                let date = new Date().toISOString().split('T')[0];
+
+                if (rateMatch && rateMatch[1]) {
+                    rate = parseFloat(rateMatch[1].replace(',', '.'));
+                }
+                if (dateMatch && dateMatch[1]) {
+                    date = dateMatch[1].split('T')[0];
+                }
+                resolve({ rate, date });
+            });
+        }).on('error', (e) => {
+            console.error("BCV Fetch Error:", e);
+            resolve({ rate: 0, date: new Date().toISOString().split('T')[0] });
+        });
+    });
 }
 
 async function fetchBinanceP2P(tradeType) {
