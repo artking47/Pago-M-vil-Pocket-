@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createWorker } from 'tesseract.js';
+import Tesseract from 'tesseract.js';
 
 function PriceScanner({ onScan, onClose }) {
     const videoRef = useRef(null);
@@ -46,9 +46,9 @@ function PriceScanner({ onScan, onClose }) {
         const vW = video.videoWidth;
         const vH = video.videoHeight;
         
-        // Grab the middle 60% w x 30% h to speed up OCR
-        const cropW = vW * 0.6;
-        const cropH = vH * 0.3;
+        // Hacer la zona de recorte mucho más horizontal (etiquetas de súper)
+        const cropW = vW * 0.8;
+        const cropH = vH * 0.2;
         const startX = (vW - cropW) / 2;
         const startY = (vH - cropH) / 2;
 
@@ -63,14 +63,13 @@ function PriceScanner({ onScan, onClose }) {
         const imgData = canvas.toDataURL('image/jpeg');
 
         try {
-            setStatus('Leyendo etiqueta con IA...');
-            const worker = await createWorker('eng');
+            setStatus('Analizando etiqueta con IA...');
             
-            // Eliminamos la lista blanca restrictiva para poder leer letras del producto
-            // await worker.setParameters({ ... });
-            
-            const { data: { text } } = await worker.recognize(imgData);
-            await worker.terminate();
+            const { data: { text } } = await Tesseract.recognize(
+                imgData,
+                'eng',
+                { logger: m => console.log(m) }
+            );
 
             // Matches numbers like 14.50 or 1,200.00
             const priceMatch = text.match(/\d+([.,]\d+)?/);
@@ -93,7 +92,7 @@ function PriceScanner({ onScan, onClose }) {
             }
         } catch (err) {
             console.error("OCR Error:", err);
-            setStatus('Error de IA al leer.');
+            setStatus(`Error de IA al leer: ${err?.message || 'Desconocido'}`);
             setScanning(false);
         }
     };
@@ -110,8 +109,8 @@ function PriceScanner({ onScan, onClose }) {
                 
                 {/* Bounding box guide overlay */}
                 <div className="absolute inset-0 pointer-events-none flex flex-col justify-center items-center shadow-[inset_0_0_0_9999px_rgba(0,0,0,0.5)]">
-                    <div className="w-[60%] h-[30%] border-2 border-primary rounded-xl flex items-center justify-center relative">
-                         <span className="absolute -top-8 text-white text-xs font-bold shadow-md bg-black/50 px-3 py-1 rounded-full">Enfoca el precio aquí</span>
+                    <div className="w-[80%] h-[20%] border-2 border-primary rounded-xl flex items-center justify-center relative">
+                         <span className="absolute -top-8 text-white text-xs font-bold shadow-md bg-black/50 px-3 py-1 rounded-full whitespace-nowrap">Enfoca el precio aquí</span>
                          <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-primary rounded-tl-xl"></div>
                          <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-primary rounded-tr-xl"></div>
                          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-primary rounded-bl-xl"></div>
