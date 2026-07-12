@@ -4,12 +4,19 @@ import BankCard from './BankCard';
 import ThemeToggle from './ThemeToggle';
 import CurrencyCalculator from './CurrencyCalculator';
 import RateHistoryChart from './RateHistoryChart';
+import ShoppingList from './ShoppingList';
 import { getConversionHistory, clearConversionHistory } from './ConversionHistory';
 import { CurrencyFlag } from './FlagIcons';
 
 function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabChange }) {
     const { theme } = useTheme();
     const [history, setHistory] = useState(() => getConversionHistory());
+
+    React.useEffect(() => {
+        if (activeTab === 'profile') {
+            setHistory(getConversionHistory());
+        }
+    }, [activeTab]);
 
     const handleClearHistory = () => {
         clearConversionHistory();
@@ -18,12 +25,11 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
 
     const logoSrc = theme === 'light' ? '/isotipo-light.png' : '/isotipo-dark.png';
 
-    // Nav items
     const navItems = [
         { id: 'calculator', icon: 'calculate', label: 'Calculadora', fill: true },
         { id: 'rates', icon: 'show_chart', label: 'Tasas', fill: false },
+        { id: 'shopping', icon: 'shopping_cart', label: 'Compras', fill: false },
         { id: 'accounts', icon: 'account_balance_wallet', label: 'Cuentas', fill: false },
-        { id: 'history', icon: 'history', label: 'Historial', fill: false },
         { id: 'profile', icon: 'person', label: 'Perfil', fill: false },
     ];
 
@@ -125,75 +131,9 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                     </div>
                 )}
 
-                {/* ═══════ HISTORY TAB ═══════ */}
-                {activeTab === 'history' && (
-                    <div className="animate-fade-in-up">
-                        <section className="mb-6 pt-4">
-                            <h2 className="text-on-surface font-h2 text-h2">Historial</h2>
-                            <p className="text-on-surface-variant font-body-sm text-body-sm">Tus conversiones recientes</p>
-                        </section>
-
-                        {history.length === 0 ? (
-                            <section className="glass-surface rounded-2xl p-xl flex flex-col items-center text-center gap-md">
-                                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-primary text-4xl">history</span>
-                                </div>
-                                <div className="space-y-2">
-                                    <h3 className="text-on-surface font-h3 text-h3">Sin historial</h3>
-                                    <p className="text-on-surface-variant font-body-sm text-body-sm max-w-[280px] mx-auto">Realiza tu primera conversión en la calculadora y aparecerá aquí.</p>
-                                </div>
-                                <button onClick={() => onTabChange('calculator')} className="btn-glass btn-glass-primary px-6 gap-2">
-                                    <span className="material-symbols-outlined text-sm">calculate</span>
-                                    Ir a Calculadora
-                                </button>
-                            </section>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="bg-white/10 text-on-surface-variant text-[11px] px-2 py-0.5 rounded-full font-bold">{history.length} conversión{history.length > 1 ? 'es' : ''}</span>
-                                    <button onClick={handleClearHistory} className="text-error text-sm font-bold flex items-center gap-1 active:scale-95 transition-transform">
-                                        <span className="material-symbols-outlined text-sm">delete</span>
-                                        Limpiar
-                                    </button>
-                                </div>
-                                <div className="space-y-2">
-                                    {history.map((item, index) => {
-                                        const time = new Date(item.timestamp).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
-                                        const date = new Date(item.timestamp).toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
-                                        const getSymbol = (code) => {
-                                            if (code === 'VES') return 'Bs.';
-                                            if (code === 'USD') return '$';
-                                            if (code === 'EUR') return '€';
-                                            if (code === 'USDT') return '₮';
-                                            if (code === 'COP') return 'COL$';
-                                            if (code === 'PEN') return 'S/';
-                                            return '$';
-                                        };
-                                        return (
-                                            <div key={item.id || index} className="glass-surface p-4 rounded-xl flex items-center justify-between animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                        <CurrencyFlag code={item.fromCode} size={24} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-on-surface font-semibold text-sm">{getSymbol(item.fromCode)} {item.fromAmount || '—'} <span className="text-[10px] text-outline font-normal">({item.fromCode})</span></p>
-                                                        <p className="text-outline text-xs">{date} • {time}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right flex items-center gap-2">
-                                                    <div>
-                                                        <p className="text-primary font-bold text-sm">{getSymbol(item.toCode)} {item.toAmount || '—'}</p>
-                                                        <p className="text-outline text-[10px]">Tasa: {item.rate || '—'}</p>
-                                                    </div>
-                                                    <CurrencyFlag code={item.toCode} size={20} />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                {/* ═══════ SHOPPING TAB ═══════ */}
+                {activeTab === 'shopping' && (
+                    <ShoppingList />
                 )}
 
                 {/* ═══════ PROFILE TAB ═══════ */}
@@ -228,7 +168,7 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                         </div>
 
                         {/* Info Items */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 mb-8">
                             {[
                                 { icon: 'verified_user', label: 'Seguridad', desc: 'Datos almacenados localmente en tu dispositivo', color: 'text-primary' },
                                 { icon: 'cloud_off', label: 'Sin servidor', desc: 'No se envían datos a ningún servidor externo', color: 'text-secondary' },
@@ -246,6 +186,51 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                                 </div>
                             ))}
                         </div>
+
+                        {/* HISTORIAL SECCION (Movido al perfil) */}
+                        <section className="mb-4">
+                            <h3 className="text-on-surface font-h3 text-h3 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-secondary">history</span>
+                                Historial de Conversiones
+                            </h3>
+                        </section>
+                        
+                        {history.length === 0 ? (
+                            <div className="glass-surface rounded-2xl p-6 text-center text-outline">
+                                <p className="text-sm">No hay conversiones recientes</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] font-bold text-outline">Últimas {history.length}</span>
+                                    <button onClick={handleClearHistory} className="text-error text-xs font-bold flex items-center gap-1 active:scale-95 transition-transform">
+                                        Limpiar
+                                    </button>
+                                </div>
+                                {history.slice(0, 10).map((item, index) => {
+                                    const time = new Date(item.timestamp).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+                                    const getSymbol = (code) => {
+                                        if (code === 'VES') return 'Bs.';
+                                        if (code === 'USD') return '$';
+                                        if (code === 'EUR') return '€';
+                                        if (code === 'USDT') return '₮';
+                                        return '$';
+                                    };
+                                    return (
+                                        <div key={item.id || index} className="glass-surface p-3 rounded-xl flex items-center justify-between">
+                                            <div>
+                                                <p className="text-on-surface font-semibold text-sm">{getSymbol(item.fromCode)} {item.fromAmount || '—'}</p>
+                                                <p className="text-outline text-[10px]">{time}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-primary font-bold text-sm">{getSymbol(item.toCode)} {item.toAmount || '—'}</p>
+                                                <p className="text-outline text-[10px]">Tasa: {item.rate || '—'}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         {/* Footer in profile */}
                         <div className="mt-8 text-center space-y-2">
