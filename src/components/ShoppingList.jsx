@@ -13,7 +13,18 @@ function ShoppingList() {
         localStorage.setItem('shoppingListItems', JSON.stringify(items));
     }, [items]);
 
+    const [savedLists, setSavedLists] = useState(() => {
+        const saved = localStorage.getItem('shoppingSavedLists');
+        return saved ? JSON.parse(saved) : [];
+    });
+    
+    useEffect(() => {
+        localStorage.setItem('shoppingSavedLists', JSON.stringify(savedLists));
+    }, [savedLists]);
+
     const [showScanner, setShowScanner] = useState(false);
+    const [showSavedModal, setShowSavedModal] = useState(false);
+    const [expandedListId, setExpandedListId] = useState(null);
     const [itemName, setItemName] = useState('');
     const [itemPrice, setItemPrice] = useState('');
     const [inputCurrency, setInputCurrency] = useState('USD');
@@ -53,6 +64,27 @@ function ShoppingList() {
         setShowScanner(false);
     };
 
+    const handleSaveList = () => {
+        if (items.length === 0) return;
+        const totalUSD = items.reduce((sum, item) => sum + item.priceUSD, 0);
+        const totalVES = items.reduce((sum, item) => sum + item.priceVES, 0);
+        
+        const newList = {
+            id: Date.now(),
+            date: new Date().toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            totalUSD,
+            totalVES,
+            items: [...items]
+        };
+        
+        setSavedLists([newList, ...savedLists]);
+        setItems([]);
+    };
+
+    const deleteSavedList = (id) => {
+        setSavedLists(savedLists.filter(list => list.id !== id));
+    };
+
     const deleteItem = (id) => {
         setItems(items.filter(item => item.id !== id));
     };
@@ -62,9 +94,18 @@ function ShoppingList() {
 
     return (
         <div className="animate-fade-in-up pb-48">
-            <section className="mb-6 pt-4">
-                <h2 className="text-on-surface font-h2 text-h2">Lista de Compras</h2>
-                <p className="text-on-surface-variant font-body-sm text-body-sm">Escanea y controla lo que gastas en el súper</p>
+            <section className="mb-6 pt-4 flex justify-between items-start">
+                <div>
+                    <h2 className="text-on-surface font-h2 text-h2">Lista de Compras</h2>
+                    <p className="text-on-surface-variant font-body-sm text-body-sm">Controla lo que gastas en el súper</p>
+                </div>
+                <button 
+                    onClick={() => setShowSavedModal(true)}
+                    className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-bold active:scale-95 transition-transform"
+                >
+                    <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                    Guardadas ({savedLists.length})
+                </button>
             </section>
 
             {/* Input form */}
@@ -128,9 +169,14 @@ function ShoppingList() {
                 <div className="space-y-3 mb-6">
                     <div className="flex items-center justify-between px-1 mb-2">
                         <span className="text-[11px] font-bold text-outline uppercase tracking-widest">{items.length} Artículos</span>
-                        <button onClick={() => setItems([])} className="text-[11px] text-error font-bold uppercase tracking-widest flex items-center gap-1 active:scale-95">
-                            <span className="material-symbols-outlined text-[14px]">delete_sweep</span> Vaciar
-                        </button>
+                        <div className="flex gap-4">
+                            <button onClick={() => setItems([])} className="text-[11px] text-error font-bold uppercase tracking-widest flex items-center gap-1 active:scale-95">
+                                <span className="material-symbols-outlined text-[14px]">delete_sweep</span> Vaciar
+                            </button>
+                            <button onClick={handleSaveList} className="text-[11px] text-secondary font-bold uppercase tracking-widest flex items-center gap-1 active:scale-95">
+                                <span className="material-symbols-outlined text-[14px]">save</span> Guardar Lista
+                            </button>
+                        </div>
                     </div>
                     {items.map(item => (
                         <div key={item.id} className="glass-surface p-3.5 rounded-xl flex items-center justify-between animate-slide-down">
@@ -180,6 +226,75 @@ function ShoppingList() {
                     onScan={handleScan}
                     onClose={() => setShowScanner(false)}
                 />
+            )}
+
+            {/* Modal de Listas Guardadas */}
+            {showSavedModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
+                    <div className="bg-surface w-full h-[85vh] rounded-t-3xl border-t border-white/10 flex flex-col animate-slide-up">
+                        <div className="flex justify-between items-center p-6 border-b border-white/5">
+                            <h3 className="text-on-surface font-h3 text-h3 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">receipt_long</span>
+                                Compras Guardadas
+                            </h3>
+                            <button onClick={() => setShowSavedModal(false)} className="w-8 h-8 rounded-full bg-white/5 text-outline flex items-center justify-center active:scale-90">
+                                <span className="material-symbols-outlined text-sm">close</span>
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-12">
+                            {savedLists.length === 0 ? (
+                                <div className="text-center text-outline mt-10">
+                                    <span className="material-symbols-outlined text-4xl mb-2 opacity-50">inbox</span>
+                                    <p className="text-sm">No tienes compras guardadas</p>
+                                </div>
+                            ) : (
+                                savedLists.map(list => (
+                                    <div key={list.id} className="glass-surface rounded-xl overflow-hidden">
+                                        <div 
+                                            className="p-4 flex items-center justify-between cursor-pointer active:bg-white/5"
+                                            onClick={() => setExpandedListId(expandedListId === list.id ? null : list.id)}
+                                        >
+                                            <div>
+                                                <p className="text-on-surface font-bold text-sm">{list.date}</p>
+                                                <p className="text-outline text-xs mt-0.5">{list.items.length} artículos</p>
+                                            </div>
+                                            <div className="text-right flex items-center gap-3">
+                                                <div>
+                                                    <p className="text-primary font-bold text-sm">${list.totalUSD.toLocaleString('es-VE', {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                                                    <p className="text-outline text-[10px]">Bs. {list.totalVES.toLocaleString('es-VE', {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                                                </div>
+                                                <span className={`material-symbols-outlined text-outline transition-transform ${expandedListId === list.id ? 'rotate-180' : ''}`}>expand_more</span>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Expanded items */}
+                                        {expandedListId === list.id && (
+                                            <div className="bg-black/20 p-4 border-t border-white/5">
+                                                <div className="space-y-2 mb-4">
+                                                    {list.items.map(item => (
+                                                        <div key={item.id} className="flex justify-between items-center text-sm">
+                                                            <span className="text-on-surface-variant line-clamp-1 flex-1 pr-2">{item.name}</span>
+                                                            <div className="flex gap-3 text-right shrink-0">
+                                                                <span className="text-outline text-xs w-[70px]">Bs. {item.priceVES.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                                <span className="text-on-surface font-semibold w-[50px]">${item.priceUSD.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="flex justify-end pt-2 border-t border-white/5">
+                                                    <button onClick={() => deleteSavedList(list.id)} className="text-error text-xs font-bold flex items-center gap-1 active:scale-95">
+                                                        <span className="material-symbols-outlined text-[14px]">delete</span> Eliminar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
