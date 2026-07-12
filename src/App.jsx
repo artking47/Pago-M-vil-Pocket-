@@ -11,7 +11,14 @@ const APP_VERSION = 'v0.2.0';
 function App() {
     const [banks, setBanks] = useState([]);
     const [showForm, setShowForm] = useState(false);
-    const [showSplash, setShowSplash] = useState(true);
+    const [showSplash, setShowSplash] = useState(() => {
+        const lastSplash = sessionStorage.getItem('lastSplashTime');
+        const now = Date.now();
+        if (!lastSplash || now - parseInt(lastSplash) > 1000 * 60 * 60 * 2) {
+            return true;
+        }
+        return false;
+    });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
     const [activeTab, setActiveTab] = useState('calculator');
 
@@ -37,8 +44,13 @@ function App() {
         }
     };
 
+    const handleSplashFinish = () => {
+        sessionStorage.setItem('lastSplashTime', Date.now().toString());
+        setShowSplash(false);
+    };
+
     if (showSplash) {
-        return <SplashScreen onFinish={() => setShowSplash(false)} />;
+        return <SplashScreen onFinish={handleSplashFinish} />;
     }
 
     return (
