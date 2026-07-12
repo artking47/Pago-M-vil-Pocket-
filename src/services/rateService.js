@@ -152,11 +152,7 @@ class RateService {
         const fetchLiveRates = async () => {
             try {
                 // In Netlify, it routes to /.netlify/functions/rates
-                // For local dev without Netlify CLI, it might fail, but it's meant for production.
-                // We will point to the absolute path just in case.
-                const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                    ? '/.netlify/functions/rates' // or mock if needed
-                    : '/.netlify/functions/rates';
+                const apiUrl = '/.netlify/functions/rates';
                     
                 const res = await fetch(apiUrl);
                 if (res.ok) {

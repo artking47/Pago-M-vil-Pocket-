@@ -32,6 +32,13 @@ function CurrencyCalculator() {
     const [usdtTradeMode, setUsdtTradeMode] = useState('compra');
     const [history, setHistory] = useState(() => getConversionHistory());
 
+    // Payment tools states
+    const [showTools, setShowTools] = useState(false);
+    const [activeTool, setActiveTool] = useState('mixto'); // 'mixto' | 'split'
+    const [cashGiven, setCashGiven] = useState('');
+    const [splitWays, setSplitWays] = useState(2);
+    const [showMostrador, setShowMostrador] = useState(false);
+
     // Rate change animation
     const [rateFlash, setRateFlash] = useState(null); // 'up' | 'down' | null
     const prevOficialRef = useRef(todayRates.oficial);
@@ -134,6 +141,13 @@ function CurrencyCalculator() {
         const parts = value.split(',');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
         setAmount(parts.join(','));
+    };
+
+    const handleCashChange = (e) => {
+        const value = e.target.value.replace(/[^\d,]/g, '');
+        const parts = value.split(',');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        setCashGiven(parts.join(','));
     };
 
     const handleManualRateChange = (e) => {
@@ -443,14 +457,106 @@ function CurrencyCalculator() {
 
                 {/* TO result */}
                 <div className="space-y-1.5 pt-2">
-                    <div className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1">Resultado en {toLabel}</div>
+                    <div className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1 flex items-center justify-between">
+                        <span>Resultado en {toLabel}</span>
+                        <button onClick={() => setShowTools(!showTools)} className={`text-primary transition-all active:scale-90 flex items-center gap-1 ${showTools ? 'opacity-100' : 'opacity-60'}`}>
+                            <span className="text-[10px] uppercase tracking-wider">{showTools ? 'Ocultar extras' : 'Más herramientas'}</span>
+                            <span className={`material-symbols-outlined text-[14px] transition-transform ${showTools ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+                    </div>
                     <div className="glass-surface rounded-xl flex items-center justify-between px-4 h-20 border-primary/20">
-                        <p className={`text-primary font-numeral-display text-h1 transition-all duration-300 ${isSwappingAnim ? 'opacity-30 scale-95' : 'opacity-100 scale-100'}`}>
+                        <p className={`text-primary font-numeral-display text-h1 transition-all duration-300 ${isSwappingAnim ? 'opacity-30 scale-95' : 'opacity-100 scale-100'} min-w-0 truncate`}>
                             {result ? `${toSymbol} ${result}` : `${toSymbol} 0,00`}
                         </p>
-                        <button onClick={handleCopy} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-outline hover:text-on-surface transition-colors active:scale-90">
-                            <span className="material-symbols-outlined text-sm">{copied ? "check" : "content_copy"}</span>
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {result && (
+                                <button onClick={() => setShowMostrador(true)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-secondary hover:text-on-surface transition-colors active:scale-90" title="Mostrar en pantalla completa">
+                                    <span className="material-symbols-outlined text-sm">fullscreen</span>
+                                </button>
+                            )}
+                            <button onClick={handleCopy} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-outline hover:text-on-surface transition-colors active:scale-90" title="Copiar monto">
+                                <span className="material-symbols-outlined text-sm">{copied ? "check" : "content_copy"}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Extra Tools Section */}
+                <div className={`transition-all duration-400 ease-in-out overflow-hidden ${showTools ? 'max-h-[300px] opacity-100 pt-2' : 'max-h-0 opacity-0'}`}>
+                    <div className="glass-surface border border-white/5 rounded-xl p-3">
+                        <div className="flex gap-2 mb-3 bg-white/5 p-1 rounded-lg">
+                            <button onClick={() => setActiveTool('mixto')} className={`flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'mixto' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Mixto / Vuelto</button>
+                            <button onClick={() => setActiveTool('split')} className={`flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'split' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Dividir Cuenta</button>
+                        </div>
+
+                        {activeTool === 'mixto' && (
+                            <div className="space-y-3 animate-fade-in-up">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[11px] font-bold text-outline">Pago en efectivo ({fromSymbol})</label>
+                                    <div className="bg-white/[0.06] rounded-md px-2 py-1 flex items-center max-w-[120px]">
+                                        <input type="text" value={cashGiven} onChange={handleCashChange} inputMode="decimal" placeholder="0,00" className="bg-transparent border-none outline-none w-full text-right text-sm font-bold text-on-surface" />
+                                    </div>
+                                </div>
+                                {(() => {
+                                    const numTotal = parseFloat(amount.replace(/\./g, '').replace(',', '.')) || 0;
+                                    const numCash = parseFloat(cashGiven.replace(/\./g, '').replace(',', '.')) || 0;
+                                    const rate = getRateForDisplay();
+                                    if (numTotal === 0 || rate === 0) return null;
+                                    
+                                    const diff = numTotal - numCash;
+                                    const finalAmount = isSwapped ? (Math.abs(diff) / rate) : (Math.abs(diff) * rate);
+                                    const formatted = finalAmount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    
+                                    if (diff > 0) {
+                                        return (
+                                            <div className="bg-primary/10 border-l-2 border-l-primary p-2 rounded-lg flex items-center justify-between">
+                                                <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Falta pagar</span>
+                                                <span className="font-bold text-primary">{toSymbol} {formatted}</span>
+                                            </div>
+                                        );
+                                    } else if (diff < 0) {
+                                        return (
+                                            <div className="bg-secondary/10 border-l-2 border-l-secondary p-2 rounded-lg flex items-center justify-between">
+                                                <span className="text-[11px] font-bold text-secondary uppercase tracking-wider">Dar vuelto de</span>
+                                                <span className="font-bold text-secondary">{toSymbol} {formatted}</span>
+                                            </div>
+                                        );
+                                    } else {
+                                        return (
+                                            <div className="bg-green-500/10 border-l-2 border-l-green-500 p-2 rounded-lg flex items-center justify-between">
+                                                <span className="text-[11px] font-bold text-green-400 uppercase tracking-wider">Pago exacto</span>
+                                                <span className="font-bold text-green-400">{toSymbol} 0,00</span>
+                                            </div>
+                                        );
+                                    }
+                                })()}
+                            </div>
+                        )}
+
+                        {activeTool === 'split' && (
+                            <div className="space-y-3 animate-fade-in-up">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[11px] font-bold text-outline">Número de personas</label>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setSplitWays(Math.max(2, splitWays - 1))} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 active:scale-90"><span className="material-symbols-outlined text-sm">remove</span></button>
+                                        <span className="font-bold text-lg w-6 text-center">{splitWays}</span>
+                                        <button onClick={() => setSplitWays(splitWays + 1)} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 active:scale-90"><span className="material-symbols-outlined text-sm">add</span></button>
+                                    </div>
+                                </div>
+                                {(() => {
+                                    const numResult = parseFloat(result.replace(/\./g, '').replace(',', '.'));
+                                    if (isNaN(numResult) || numResult === 0) return null;
+                                    const splitAmount = numResult / splitWays;
+                                    const formatted = splitAmount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    return (
+                                        <div className="bg-white/5 border border-white/10 p-3 rounded-lg text-center mt-2">
+                                            <span className="text-[10px] text-outline uppercase font-bold tracking-widest block mb-1">A cada uno le toca</span>
+                                            <span className="font-numeral-display text-2xl text-on-surface">{toSymbol} {formatted}</span>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -485,6 +591,33 @@ function CurrencyCalculator() {
                                 </div>
                             );
                         })}
+                    </div>
+                </div>
+            )}
+
+            {/* Mostrador Fullscreen Modal */}
+            {showMostrador && (
+                <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-2xl flex flex-col justify-center items-center animate-fade-in px-6">
+                    <button onClick={() => setShowMostrador(false)} className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-outline hover:text-on-surface transition-all active:scale-90">
+                        <span className="material-symbols-outlined text-xl">close</span>
+                    </button>
+                    <div className="text-center w-full max-w-sm">
+                        <p className="text-outline uppercase tracking-widest font-bold text-sm mb-4">Total a Pagar</p>
+                        <div className="text-[18vw] sm:text-7xl font-numeral-display text-primary leading-none mb-6 font-extrabold truncate w-full" style={{ filter: 'drop-shadow(0 0 40px rgba(66, 133, 244, 0.4))' }}>
+                            {result}
+                        </div>
+                        <p className="text-on-surface font-semibold text-xl mb-8 flex items-center justify-center gap-2">
+                            <span>{targetCurrency === 'VES' ? 'Bolívares' : targetCur?.name || targetCurrency}</span>
+                            <CurrencyFlag code={targetCurrency} size={24} />
+                        </p>
+                        
+                        <div className="glass-surface p-4 rounded-2xl mx-auto w-full max-w-[280px]">
+                            <p className="text-xs text-outline mb-1">Referencia ({selectedCurrency})</p>
+                            <p className="text-on-surface font-bold text-lg">{fromSymbol} {amount || '0,00'}</p>
+                            <div className="w-full h-px bg-white/10 my-3"></div>
+                            <p className="text-[10px] text-outline font-bold uppercase tracking-wider mb-0.5">Tasa aplicada</p>
+                            <p className="text-sm font-semibold text-secondary">Bs. {displayRate > 0 ? displayRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—'}</p>
+                        </div>
                     </div>
                 </div>
             )}
