@@ -17,6 +17,49 @@ export function getVenezuelaDateStr(offset = 0) {
     return `${y}-${m}-${d}`;
 }
 
+// Get Venezuela day of week (0=Sunday, 6=Saturday)
+export function getVenezuelaDayOfWeek() {
+    const now = new Date();
+    const vzNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Caracas' }));
+    return vzNow.getDay();
+}
+
+// Get the effective "today" date for BCV rates:
+// On weekends, Friday's rate stays in effect, so we return last Friday's date.
+export function getEffectiveTodayDateStr() {
+    const now = new Date();
+    const vzNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Caracas' }));
+    const day = vzNow.getDay();
+    // Saturday (6) → go back 1 day to Friday
+    // Sunday (0) → go back 2 days to Friday
+    if (day === 6) vzNow.setDate(vzNow.getDate() - 1);
+    else if (day === 0) vzNow.setDate(vzNow.getDate() - 2);
+    const y = vzNow.getFullYear();
+    const m = String(vzNow.getMonth() + 1).padStart(2, '0');
+    const d = String(vzNow.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+// Get the next business day date string (for "mañana" rates):
+// From Monday-Thursday → next calendar day
+// From Friday → Monday (+3)
+// From Saturday → Monday (+2)
+// From Sunday → Monday (+1)
+export function getNextBusinessDayDateStr() {
+    const now = new Date();
+    const vzNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Caracas' }));
+    const day = vzNow.getDay();
+    let daysToAdd = 1;
+    if (day === 5) daysToAdd = 3;      // Friday → Monday
+    else if (day === 6) daysToAdd = 2;  // Saturday → Monday
+    else if (day === 0) daysToAdd = 1;  // Sunday → Monday
+    vzNow.setDate(vzNow.getDate() + daysToAdd);
+    const y = vzNow.getFullYear();
+    const m = String(vzNow.getMonth() + 1).padStart(2, '0');
+    const d = String(vzNow.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 class RateService {
     constructor() {
         this._emitter = new EventTarget();
@@ -134,7 +177,11 @@ class RateService {
 
     // ── Process Backend Data ──
     async _processBackendData(backendData) {
-        const todayStr = getVenezuelaDateStr(0);
+        const calendarTodayStr = getVenezuelaDateStr(0);
+        const effectiveTodayStr = getEffectiveTodayDateStr();
+        const nextBizDayStr = getNextBusinessDayDateStr();
+        const dayOfWeek = getVenezuelaDayOfWeek();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
         
         this._previousRates = {
             oficial: this._todayRates.oficial,
@@ -146,6 +193,7 @@ class RateService {
         let foundTomorrow = false;
 
         // Get today's effective rate from history
+        // On weekends, "today" is Friday's rate (the last business day)
         let historicalTodayRate = 0;
         let historicalYesterdayRate = 0;
 
@@ -154,10 +202,11 @@ class RateService {
                 .filter(d => d.fuente === 'oficial')
                 .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
-            const todayEntry = oficialRates.find(d => d.fecha === todayStr);
+            // Use effective date (Friday on weekends) to find today's rate
+            const todayEntry = oficialRates.find(d => d.fecha === effectiveTodayStr);
             if (todayEntry) historicalTodayRate = todayEntry.promedio;
 
-            const prevBizDay = this._getPreviousBusinessDayStr(todayStr);
+            const prevBizDay = this._getPreviousBusinessDayStr(effectiveTodayStr);
             const prevEntry = oficialRates.find(d => d.fecha === prevBizDay);
             if (prevEntry) historicalYesterdayRate = prevEntry.promedio;
 
@@ -180,15 +229,30 @@ class RateService {
         newTomorrowRates.usdtCompra = usdtCompra;
         newTomorrowRates.usdtVenta = usdtVenta;
         
+        // On weekends, "today" rate = Friday's rate (the last published BCV rate)
         newTodayRates.oficial = historicalTodayRate > 0 ? historicalTodayRate : liveOficialRate;
 
         if (liveOficialRate > 0) {
-            if (liveOficialDate >= todayStr) {
-                newTomorrowRates.oficial = liveOficialRate;
-                foundTomorrow = true;
-            } else if (liveOficialRate !== historicalYesterdayRate && historicalYesterdayRate > 0) {
-                newTomorrowRates.oficial = liveOficialRate;
-                foundTomorrow = true;
+            if (isWeekend) {
+                // On weekends: the BCV API may show the latest published rate.
+                // "Tomorrow" (Monday) rate: if the live date >= next business day, it's the new rate
+                if (liveOficialDate >= nextBizDayStr) {
+                    newTomorrowRates.oficial = liveOficialRate;
+                    foundTomorrow = true;
+                } else {
+                    // No new rate published yet for Monday — no "tomorrow" rate available
+                    newTomorrowRates.oficial = 0;
+                    foundTomorrow = false;
+                }
+            } else {
+                // Weekday logic (original)
+                if (liveOficialDate >= calendarTodayStr) {
+                    newTomorrowRates.oficial = liveOficialRate;
+                    foundTomorrow = true;
+                } else if (liveOficialRate !== historicalYesterdayRate && historicalYesterdayRate > 0) {
+                    newTomorrowRates.oficial = liveOficialRate;
+                    foundTomorrow = true;
+                }
             }
             
             if (newTodayRates.oficial === 0) {
