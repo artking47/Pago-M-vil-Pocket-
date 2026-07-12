@@ -603,7 +603,7 @@ function CurrencyCalculator() {
                     </button>
                     <div className="text-center w-full max-w-sm">
                         <p className="text-outline uppercase tracking-widest font-bold text-sm mb-4">Total a Pagar</p>
-                        <div className="text-[18vw] sm:text-7xl font-numeral-display text-primary leading-none mb-6 font-extrabold truncate w-full" style={{ filter: 'drop-shadow(0 0 40px rgba(66, 133, 244, 0.4))' }}>
+                        <div className="text-[12vw] sm:text-7xl font-numeral-display text-primary leading-none mb-6 font-extrabold break-words w-full px-4" style={{ filter: 'drop-shadow(0 0 40px rgba(66, 133, 244, 0.4))' }}>
                             {result}
                         </div>
                         <p className="text-on-surface font-semibold text-xl mb-8 flex items-center justify-center gap-2">
