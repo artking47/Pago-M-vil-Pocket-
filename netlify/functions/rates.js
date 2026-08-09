@@ -66,7 +66,7 @@ async function fetchBinanceP2P(tradeType) {
     }
 }
 
-exports.handler = async function(event, context) {
+export const handler = async function(event, context) {
     try {
         const bcv = await fetchBCVRate();
         const usdtCompra = await fetchBinanceP2P('SELL'); // User buys -> Merchant sells
