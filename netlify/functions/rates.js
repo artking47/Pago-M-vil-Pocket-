@@ -1,17 +1,36 @@
 async function fetchBCVRate() {
     try {
         const response = await fetch('https://rates.dolarvzla.com/bcv/current.json');
-        if (!response.ok) throw new Error('DolarVZLA API failed');
-        
-        const data = await response.json();
-        return {
-            rate: data.current.usd,
-            date: data.current.date
-        };
+        if (response.ok) {
+            const data = await response.json();
+            if (data?.current?.usd) {
+                return {
+                    rate: data.current.usd,
+                    date: data.current.date
+                };
+            }
+        }
     } catch (e) {
         console.error("BCV Fetch Error (DolarVZLA):", e);
-        return { rate: 0, date: new Date().toISOString().split('T')[0] };
     }
+
+    // Fallback 1: DolarAPI
+    try {
+        const response = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+        if (response.ok) {
+            const data = await response.json();
+            if (data?.promedio) {
+                return {
+                    rate: data.promedio,
+                    date: data.fecha || new Date().toISOString().split('T')[0]
+                };
+            }
+        }
+    } catch (e) {
+        console.error("BCV Fetch Error (DolarAPI):", e);
+    }
+
+    return { rate: 0, date: new Date().toISOString().split('T')[0] };
 }
 
 async function fetchBinanceP2P(tradeType) {
@@ -20,7 +39,7 @@ async function fetchBinanceP2P(tradeType) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             },
             body: JSON.stringify({
                 page: 1,

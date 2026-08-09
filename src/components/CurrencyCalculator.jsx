@@ -80,7 +80,7 @@ function CurrencyCalculator() {
 
     // Calculate rate
     const getRateForDisplay = useCallback(() => {
-        const activeRates = rateView === 'hoy' ? todayRates : tomorrowRates;
+        const activeRates = (rateView === 'manana' && hasTomorrowRate) ? tomorrowRates : todayRates;
 
         const getValueInVes = (code) => {
             if (code === 'VES') return 1.0;

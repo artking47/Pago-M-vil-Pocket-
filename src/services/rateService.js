@@ -202,11 +202,30 @@ class RateService {
         }
 
         // Live Rates from Backend
-        const liveOficialRate = backendData.oficial;
-        const liveOficialDate = backendData.oficialDate;
-        const liveParaleloRate = backendData.paralelo;
-        const usdtCompra = backendData.usdtCompra || 0;
-        const usdtVenta = backendData.usdtVenta || 0;
+        let liveOficialRate = backendData.oficial || 0;
+        let liveOficialDate = backendData.oficialDate;
+        let liveParaleloRate = backendData.paralelo || 0;
+        let usdtCompra = backendData.usdtCompra || 0;
+        let usdtVenta = backendData.usdtVenta || 0;
+
+        // Client-side fallback if backend failed to get official rate
+        if (liveOficialRate === 0) {
+            try {
+                const directRes = await fetch('https://rates.dolarvzla.com/bcv/current.json').then(r => r.json());
+                if (directRes?.current?.usd) {
+                    liveOficialRate = directRes.current.usd;
+                    liveOficialDate = directRes.current.date;
+                }
+            } catch (e) {
+                try {
+                    const dApiRes = await fetch('https://ve.dolarapi.com/v1/dolares/oficial').then(r => r.json());
+                    if (dApiRes?.promedio) {
+                        liveOficialRate = dApiRes.promedio;
+                        liveOficialDate = dApiRes.fecha || calendarTodayStr;
+                    }
+                } catch (e2) {}
+            }
+        }
 
         newTodayRates.paralelo = liveParaleloRate;
         newTomorrowRates.paralelo = liveParaleloRate;
@@ -267,6 +286,20 @@ class RateService {
             newTomorrowRates.eur = this._tomorrowRates.eur;
             newTomorrowRates.cop = this._tomorrowRates.cop;
             newTomorrowRates.pen = this._tomorrowRates.pen;
+        }
+
+        // Protect against zero-wiping cached rates
+        if (newTodayRates.oficial === 0 && this._todayRates.oficial > 0) {
+            newTodayRates.oficial = this._todayRates.oficial;
+        }
+        if (newTodayRates.paralelo === 0 && this._todayRates.paralelo > 0) {
+            newTodayRates.paralelo = this._todayRates.paralelo;
+        }
+        if (newTodayRates.usdtCompra === 0 && this._todayRates.usdtCompra > 0) {
+            newTodayRates.usdtCompra = this._todayRates.usdtCompra;
+        }
+        if (newTodayRates.usdtVenta === 0 && this._todayRates.usdtVenta > 0) {
+            newTodayRates.usdtVenta = this._todayRates.usdtVenta;
         }
 
         this._todayRates = newTodayRates;
