@@ -348,7 +348,7 @@ function CurrencyCalculator() {
                             </button>
                         </div>
                         <div className="pt-1">
-                            {loading ? (
+                            {loading && displayRate === 0 ? (
                                 <div className="h-8 w-48 bg-white/10 animate-pulse rounded-md mt-1"></div>
                             ) : (
                                 <p className={`text-primary font-numeral-display text-h2 truncate transition-all duration-300 ${flashClass}`}>

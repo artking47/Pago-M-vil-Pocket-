@@ -324,6 +324,7 @@ class RateService {
             }
         } catch (err) {
             this._loadCached();
+            this._loading = false;
             this._emit('error', err);
             this._emit('loading', false);
         } finally {
@@ -347,9 +348,13 @@ class RateService {
                 this._emit('historicalUpdated', recent);
                 // After getting history, re-fetch live to update today/tomorrow logic
                 this.fetchLiveRates();
+            } else {
+                this._emit('historicalUpdated', this._historicalData);
+                this.fetchLiveRates();
             }
         } catch {
             this._emit('historicalUpdated', this._historicalData);
+            this.fetchLiveRates();
         }
     }
 
