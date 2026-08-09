@@ -26,6 +26,7 @@ function ShoppingList() {
     const [showSavedModal, setShowSavedModal] = useState(false);
     const [expandedListId, setExpandedListId] = useState(null);
     const [itemName, setItemName] = useState('');
+    const [itemQuantity, setItemQuantity] = useState(1);
     const [itemPrice, setItemPrice] = useState('');
     const [inputCurrency, setInputCurrency] = useState('USD');
 
@@ -42,10 +43,12 @@ function ShoppingList() {
             name: itemName,
             originalPrice: priceNum,
             originalCurrency: inputCurrency,
+            quantity: itemQuantity || 1,
         }]);
 
         setItemName('');
         setItemPrice('');
+        setItemQuantity(1);
     };
 
     const handleScan = (scannedData) => {
@@ -56,17 +59,34 @@ function ShoppingList() {
         setShowScanner(false);
     };
 
+    // BUG-13 fix: Derive USD/VES from original price + current rate
+    const getItemPrices = (item) => {
+        const qty = item.quantity || 1;
+        // Support legacy items that have priceUSD/priceVES directly
+        if (item.originalPrice !== undefined) {
+            if (item.originalCurrency === 'USD') {
+                return { priceUSD: item.originalPrice * qty, priceVES: item.originalPrice * rate * qty };
+            } else {
+                return { priceVES: item.originalPrice * qty, priceUSD: (item.originalPrice / rate) * qty };
+            }
+        }
+        // Legacy fallback
+        return { priceUSD: (item.priceUSD || 0) * qty, priceVES: (item.priceVES || 0) * qty };
+    };
+
+    const itemsWithPrices = items.map(item => ({ ...item, ...getItemPrices(item) }));
+    const totalUSD = itemsWithPrices.reduce((sum, item) => sum + (item.priceUSD || 0), 0);
+    const totalVES = itemsWithPrices.reduce((sum, item) => sum + (item.priceVES || 0), 0);
+
     const handleSaveList = () => {
-        if (items.length === 0) return;
-        const totalUSD = items.reduce((sum, item) => sum + item.priceUSD, 0);
-        const totalVES = items.reduce((sum, item) => sum + item.priceVES, 0);
+        if (itemsWithPrices.length === 0) return;
         
         const newList = {
             id: Date.now(),
             date: new Date().toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
             totalUSD,
             totalVES,
-            items: [...items]
+            items: [...itemsWithPrices]
         };
         
         setSavedLists([newList, ...savedLists]);
@@ -80,24 +100,6 @@ function ShoppingList() {
     const deleteItem = (id) => {
         setItems(items.filter(item => item.id !== id));
     };
-
-    // BUG-13 fix: Derive USD/VES from original price + current rate
-    const getItemPrices = (item) => {
-        // Support legacy items that have priceUSD/priceVES directly
-        if (item.originalPrice !== undefined) {
-            if (item.originalCurrency === 'USD') {
-                return { priceUSD: item.originalPrice, priceVES: item.originalPrice * rate };
-            } else {
-                return { priceVES: item.originalPrice, priceUSD: item.originalPrice / rate };
-            }
-        }
-        // Legacy fallback
-        return { priceUSD: item.priceUSD || 0, priceVES: item.priceVES || 0 };
-    };
-
-    const itemsWithPrices = items.map(item => ({ ...item, ...getItemPrices(item) }));
-    const totalUSD = itemsWithPrices.reduce((sum, item) => sum + item.priceUSD, 0);
-    const totalVES = itemsWithPrices.reduce((sum, item) => sum + item.priceVES, 0);
 
     return (
         <div className="animate-fade-in-up pb-48">
@@ -117,15 +119,27 @@ function ShoppingList() {
 
             {/* Input form */}
             <form onSubmit={handleAddItem} className="glass-surface p-4 rounded-2xl mb-6 space-y-4">
-                <div>
-                    <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1 block mb-1.5">Producto</label>
-                    <input 
-                        type="text" 
-                        value={itemName}
-                        onChange={(e) => setItemName(e.target.value)}
-                        placeholder="Ej. Harina PAN"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-12 text-on-surface focus:border-primary outline-none transition-colors"
-                    />
+                <div className="flex gap-3">
+                    <div className="flex-[3]">
+                        <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1 block mb-1.5">Producto</label>
+                        <input 
+                            type="text" 
+                            value={itemName}
+                            onChange={(e) => setItemName(e.target.value)}
+                            placeholder="Ej. Harina PAN"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-12 text-on-surface focus:border-primary outline-none transition-colors"
+                        />
+                    </div>
+                    <div className="flex-[1]">
+                        <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1 block mb-1.5">Cant.</label>
+                        <input 
+                            type="number"
+                            min="1"
+                            value={itemQuantity}
+                            onChange={(e) => setItemQuantity(parseInt(e.target.value) || 1)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-2 text-center h-12 text-on-surface focus:border-primary outline-none transition-colors"
+                        />
+                    </div>
                 </div>
 
                 <div className="flex gap-3">
@@ -188,14 +202,19 @@ function ShoppingList() {
                     {itemsWithPrices.map(item => (
                         <div key={item.id} className="glass-surface p-3.5 rounded-xl flex items-center justify-between animate-slide-down">
                             <div>
-                                <p className="text-on-surface font-semibold leading-tight">{item.name}</p>
+                                <p className="text-on-surface font-semibold leading-tight flex items-center gap-2">
+                                    {item.name}
+                                    {(item.quantity > 1) && (
+                                        <span className="bg-primary/20 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-md">x{item.quantity}</span>
+                                    )}
+                                </p>
                                 <p className="text-outline text-[10px] uppercase font-bold mt-0.5">
-                                    Bs. {item.priceVES.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    Bs. {(item.priceVES || 0).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                 </p>
                             </div>
                             <div className="flex items-center gap-4">
                                 <span className="text-primary font-bold text-lg whitespace-nowrap">
-                                    ${item.priceUSD.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    ${(item.priceUSD || 0).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                 </span>
                                 <button onClick={() => deleteItem(item.id)} className="w-8 h-8 rounded-full bg-error/10 text-error flex items-center justify-center active:scale-90 flex-shrink-0">
                                     <span className="material-symbols-outlined text-sm">close</span>
@@ -272,12 +291,12 @@ function ShoppingList() {
                                         >
                                             <div>
                                                 <p className="text-on-surface font-bold text-sm">{list.date}</p>
-                                                <p className="text-outline text-xs mt-0.5">{list.items.length} artículos</p>
+                                                <p className="text-outline text-xs mt-0.5">{list.items ? list.items.length : 0} artículos</p>
                                             </div>
                                             <div className="text-right flex items-center gap-3">
                                                 <div>
-                                                    <p className="text-primary font-bold text-sm">${list.totalUSD.toLocaleString('es-VE', {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
-                                                    <p className="text-outline text-[10px]">Bs. {list.totalVES.toLocaleString('es-VE', {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                                                    <p className="text-primary font-bold text-sm">${(list.totalUSD || 0).toLocaleString('es-VE', {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                                                    <p className="text-outline text-[10px]">Bs. {(list.totalVES || 0).toLocaleString('es-VE', {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
                                                 </div>
                                                 <span className={`material-symbols-outlined text-outline transition-transform ${expandedListId === list.id ? 'rotate-180' : ''}`}>expand_more</span>
                                             </div>
@@ -287,12 +306,14 @@ function ShoppingList() {
                                         {expandedListId === list.id && (
                                             <div className="bg-black/20 p-4 border-t border-white/5">
                                                 <div className="space-y-2 mb-4">
-                                                    {list.items.map(item => (
+                                                    {(list.items || []).map(item => (
                                                         <div key={item.id} className="flex justify-between items-center text-sm">
-                                                            <span className="text-on-surface-variant line-clamp-1 flex-1 pr-2">{item.name}</span>
+                                                            <span className="text-on-surface-variant line-clamp-1 flex-1 pr-2">
+                                                                {item.name} {item.quantity > 1 && <span className="text-[10px] bg-primary/20 text-primary font-bold px-1.5 py-0.5 rounded-md ml-1">x{item.quantity}</span>}
+                                                            </span>
                                                             <div className="flex gap-3 text-right shrink-0">
-                                                                <span className="text-outline text-xs w-[70px]">Bs. {item.priceVES.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                                <span className="text-on-surface font-semibold w-[50px]">${item.priceUSD.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                                <span className="text-outline text-xs w-[70px]">Bs. {(item.priceVES || 0).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                                <span className="text-on-surface font-semibold w-[50px]">${(item.priceUSD || 0).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                             </div>
                                                         </div>
                                                     ))}
