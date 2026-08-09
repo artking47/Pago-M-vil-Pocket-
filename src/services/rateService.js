@@ -119,11 +119,13 @@ class RateService {
     _loadCached() {
         try {
             const cached = JSON.parse(localStorage.getItem(LIVE_CACHE_KEY));
-            if (cached?.todayRates) {
+            if (cached?.todayRates && cached.todayRates.oficial > 0) {
                 this._todayRates = cached.todayRates;
                 this._tomorrowRates = cached.tomorrowRates || cached.todayRates;
                 this._hasTomorrowRate = cached.hasTomorrowRate || false;
                 this._lastUpdate = cached.timestamp;
+            } else {
+                localStorage.removeItem(LIVE_CACHE_KEY);
             }
         } catch { /* ignore */ }
 
