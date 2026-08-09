@@ -37,13 +37,16 @@ function ShoppingList() {
         const priceNum = parseFloat(itemPrice.replace(/\./g, '').replace(',', '.'));
         if (!itemName || isNaN(priceNum) || priceNum <= 0) return;
         
+        const parsedQty = parseInt(itemQuantity, 10);
+        const finalQty = (!isNaN(parsedQty) && parsedQty > 0) ? parsedQty : 1;
+
         // BUG-13 fix: Store only original price + currency, recalculate on render
         setItems([...items, {
             id: Date.now(),
             name: itemName,
             originalPrice: priceNum,
             originalCurrency: inputCurrency,
-            quantity: itemQuantity || 1,
+            quantity: finalQty,
         }]);
 
         setItemName('');
@@ -136,7 +139,7 @@ function ShoppingList() {
                             type="number"
                             min="1"
                             value={itemQuantity}
-                            onChange={(e) => setItemQuantity(parseInt(e.target.value) || 1)}
+                            onChange={(e) => setItemQuantity(e.target.value)}
                             className="w-full bg-white/5 border border-white/10 rounded-xl px-2 text-center h-12 text-on-surface focus:border-primary outline-none transition-colors"
                         />
                     </div>
