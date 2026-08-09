@@ -356,6 +356,8 @@ class RateService {
             if (res.ok) {
                 const data = await res.json();
                 await this._processBackendData(data);
+            } else {
+                throw new Error('Backend HTTP error: ' + res.status);
             }
         } catch (err) {
             this._loadCached();
