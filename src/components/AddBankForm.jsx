@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { BANK_LIST, getBankColor, getBankLogo, getBankInitials } from '../utils/storage';
 import { PlusIcon, XIcon, AlertCircleIcon } from './Icons';
 
-function AddBankForm({ onAdd, onClose }) {
-    const [formData, setFormData] = useState({ banco: BANK_LIST[0], cedula: '', telefono: '' });
+function AddBankForm({ onAdd, onClose, initialData = null }) {
+    const [formData, setFormData] = useState(
+        initialData || { banco: BANK_LIST[0], cedula: '', telefono: '' }
+    );
     const [errors, setErrors] = useState({});
     const [logoError, setLogoError] = useState(false);
 
@@ -24,7 +26,12 @@ function AddBankForm({ onAdd, onClose }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (validateForm()) { onAdd(formData); setFormData({ banco: BANK_LIST[0], cedula: '', telefono: '' }); setErrors({}); onClose(); }
+        if (validateForm()) { 
+            onAdd(formData, initialData?.id); 
+            if (!initialData) setFormData({ banco: BANK_LIST[0], cedula: '', telefono: '' }); 
+            setErrors({}); 
+            onClose(); 
+        }
     };
 
     const handleChange = (e) => {
@@ -50,8 +57,8 @@ function AddBankForm({ onAdd, onClose }) {
                                 <PlusIcon className="w-6 h-6" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold">Nueva Cuenta</h2>
-                                <p className="text-white/70 text-sm">Agrega tus datos de Pago Móvil</p>
+                                <h2 className="text-xl font-bold">{initialData ? 'Editar Cuenta' : 'Nueva Cuenta'}</h2>
+                                <p className="text-white/70 text-sm">{initialData ? 'Actualiza los datos' : 'Agrega tus datos de Pago Móvil'}</p>
                             </div>
                         </div>
                         <button onClick={onClose}

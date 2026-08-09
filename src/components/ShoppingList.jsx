@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import useRates from '../hooks/useRates';
-import PriceScanner from './PriceScanner';
+const PriceScanner = lazy(() => import('./PriceScanner'));
 
 function ShoppingList() {
     const { todayRates } = useRates();
@@ -36,20 +36,12 @@ function ShoppingList() {
         const priceNum = parseFloat(itemPrice.replace(/\./g, '').replace(',', '.'));
         if (!itemName || isNaN(priceNum) || priceNum <= 0) return;
         
-        let priceUSD, priceVES;
-        if (inputCurrency === 'USD') {
-            priceUSD = priceNum;
-            priceVES = priceNum * rate;
-        } else {
-            priceVES = priceNum;
-            priceUSD = priceNum / rate;
-        }
-
+        // BUG-13 fix: Store only original price + currency, recalculate on render
         setItems([...items, {
             id: Date.now(),
             name: itemName,
-            priceUSD,
-            priceVES
+            originalPrice: priceNum,
+            originalCurrency: inputCurrency,
         }]);
 
         setItemName('');
@@ -89,8 +81,23 @@ function ShoppingList() {
         setItems(items.filter(item => item.id !== id));
     };
 
-    const totalUSD = items.reduce((sum, item) => sum + item.priceUSD, 0);
-    const totalVES = items.reduce((sum, item) => sum + item.priceVES, 0);
+    // BUG-13 fix: Derive USD/VES from original price + current rate
+    const getItemPrices = (item) => {
+        // Support legacy items that have priceUSD/priceVES directly
+        if (item.originalPrice !== undefined) {
+            if (item.originalCurrency === 'USD') {
+                return { priceUSD: item.originalPrice, priceVES: item.originalPrice * rate };
+            } else {
+                return { priceVES: item.originalPrice, priceUSD: item.originalPrice / rate };
+            }
+        }
+        // Legacy fallback
+        return { priceUSD: item.priceUSD || 0, priceVES: item.priceVES || 0 };
+    };
+
+    const itemsWithPrices = items.map(item => ({ ...item, ...getItemPrices(item) }));
+    const totalUSD = itemsWithPrices.reduce((sum, item) => sum + item.priceUSD, 0);
+    const totalVES = itemsWithPrices.reduce((sum, item) => sum + item.priceVES, 0);
 
     return (
         <div className="animate-fade-in-up pb-48">
@@ -178,7 +185,7 @@ function ShoppingList() {
                             </button>
                         </div>
                     </div>
-                    {items.map(item => (
+                    {itemsWithPrices.map(item => (
                         <div key={item.id} className="glass-surface p-3.5 rounded-xl flex items-center justify-between animate-slide-down">
                             <div>
                                 <p className="text-on-surface font-semibold leading-tight">{item.name}</p>
@@ -222,11 +229,19 @@ function ShoppingList() {
             </div>
 
             {showScanner && (
-                <PriceScanner 
-                    onScan={handleScan}
-                    onClose={() => setShowScanner(false)}
-                />
-            )}
+                <Suspense fallback={
+                    <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+                        <div className="text-center text-white">
+                            <span className="material-symbols-outlined text-4xl animate-spin mb-4 block">hourglass_empty</span>
+                            <p className="text-sm font-medium">Cargando escáner...</p>
+                        </div>
+                    </div>
+                }>
+                    <PriceScanner 
+                        onScan={handleScan}
+                        onClose={() => setShowScanner(false)}
+                    />
+                </Suspense>            )}
 
             {/* Modal de Listas Guardadas */}
             {showSavedModal && (

@@ -3,14 +3,15 @@ import { ThemeProvider } from './context/ThemeContext';
 import Dashboard from './components/Dashboard';
 import AddBankForm from './components/AddBankForm';
 import SplashScreen from './components/SplashScreen';
-import { getBanks, addBank, deleteBank } from './utils/storage';
-import './index.css';
+import { getBanks, addBank, deleteBank, updateBank } from './utils/storage';
+import { APP_VERSION } from './version';
 
-const APP_VERSION = 'v0.2.0';
+
 
 function App() {
     const [banks, setBanks] = useState([]);
     const [showForm, setShowForm] = useState(false);
+    const [editingBank, setEditingBank] = useState(null);
     const [showSplash, setShowSplash] = useState(() => {
         const lastSplash = sessionStorage.getItem('lastSplashTime');
         const now = Date.now();
@@ -27,9 +28,14 @@ function App() {
         setBanks(loadedBanks);
     }, []);
 
-    const handleAddBank = (bankData) => {
-        const newBank = addBank(bankData);
-        setBanks(prev => [...prev, newBank]);
+    const handleAddBank = (bankData, id = null) => {
+        if (id) {
+            const updated = updateBank(id, bankData);
+            setBanks(prev => prev.map(b => b.id === id ? updated : b));
+        } else {
+            const newBank = addBank(bankData);
+            setBanks(prev => [...prev, newBank]);
+        }
     };
 
     const handleDeleteBank = (id) => {
@@ -59,16 +65,21 @@ function App() {
                 <Dashboard
                     banks={banks}
                     onAddClick={() => setShowForm(true)}
+                    onEditClick={(bank) => setEditingBank(bank)}
                     onDelete={handleDeleteBank}
                     appVersion={APP_VERSION}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
                 />
 
-                {showForm && (
+                {(showForm || editingBank) && (
                     <AddBankForm
+                        initialData={editingBank}
                         onAdd={handleAddBank}
-                        onClose={() => setShowForm(false)}
+                        onClose={() => {
+                            setShowForm(false);
+                            setEditingBank(null);
+                        }}
                     />
                 )}
 

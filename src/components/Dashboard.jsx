@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import BankCard from './BankCard';
 import ThemeToggle from './ThemeToggle';
 import CurrencyCalculator from './CurrencyCalculator';
-import RateHistoryChart from './RateHistoryChart';
-import ShoppingList from './ShoppingList';
+import PaypalCalculator from './PaypalCalculator';
+import DiscountCalculator from './DiscountCalculator';
+const RateHistoryChart = lazy(() => import('./RateHistoryChart'));
+const ShoppingList = lazy(() => import('./ShoppingList'));
 import { getConversionHistory, clearConversionHistory } from './ConversionHistory';
 import { CurrencyFlag } from './FlagIcons';
 
-function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabChange }) {
+function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activeTab, onTabChange }) {
     const { theme } = useTheme();
     const [history, setHistory] = useState(() => getConversionHistory());
+    const [activeCalculator, setActiveCalculator] = useState('currency'); // 'currency' | 'paypal' | 'discount'
 
     React.useEffect(() => {
         if (activeTab === 'profile') {
@@ -21,6 +24,48 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
     const handleClearHistory = () => {
         clearConversionHistory();
         setHistory([]);
+    };
+
+    const handleExportData = () => {
+        const banksData = localStorage.getItem('pago_movil_data') || '[]';
+        const historyData = localStorage.getItem('pago_movil_history') || '[]';
+        
+        const backup = {
+            version: appVersion,
+            date: new Date().toISOString(),
+            banks: JSON.parse(banksData),
+            history: JSON.parse(historyData)
+        };
+
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pago-movil-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleImportData = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                if (data.banks) localStorage.setItem('pago_movil_data', JSON.stringify(data.banks));
+                if (data.history) localStorage.setItem('pago_movil_history', JSON.stringify(data.history));
+                
+                alert('¡Datos restaurados con éxito! La aplicación se recargará.');
+                window.location.reload();
+            } catch (err) {
+                alert('Error al leer el archivo de respaldo. Asegúrate de que sea un archivo válido.');
+            }
+        };
+        reader.readAsText(file);
     };
 
     const logoSrc = theme === 'light' ? '/isotipo-light.png' : '/isotipo-dark.png';
@@ -59,11 +104,37 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                 {activeTab === 'calculator' && (
                     <>
                         <section className="mb-4 pt-4 animate-fade-in-up">
-                            <h2 className="text-on-surface font-h2 text-h2">Dashboard</h2>
-                            <p className="text-on-surface-variant font-body-sm text-body-sm">Gestiona tus cuentas de forma simple</p>
+                            <h2 className="text-on-surface font-h2 text-h2">Herramientas</h2>
+                            <p className="text-on-surface-variant font-body-sm text-body-sm">Calculadoras útiles para tus finanzas</p>
                         </section>
 
-                        <CurrencyCalculator />
+                        <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar animate-fade-in-up">
+                            <button 
+                                onClick={() => setActiveCalculator('currency')}
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 ${activeCalculator === 'currency' ? 'bg-primary text-on-primary-fixed shadow-lg shadow-primary/20' : 'glass-surface text-outline hover:text-on-surface'}`}
+                            >
+                                <span className="material-symbols-outlined text-[18px]">currency_exchange</span>
+                                <span className="text-[12px] font-bold tracking-wide">Divisas</span>
+                            </button>
+                            <button 
+                                onClick={() => setActiveCalculator('paypal')}
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 ${activeCalculator === 'paypal' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'glass-surface text-outline hover:text-on-surface'}`}
+                            >
+                                <span className="material-symbols-outlined text-[18px]">payments</span>
+                                <span className="text-[12px] font-bold tracking-wide">PayPal</span>
+                            </button>
+                            <button 
+                                onClick={() => setActiveCalculator('discount')}
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 ${activeCalculator === 'discount' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'glass-surface text-outline hover:text-on-surface'}`}
+                            >
+                                <span className="material-symbols-outlined text-[18px]">sell</span>
+                                <span className="text-[12px] font-bold tracking-wide">Descuentos</span>
+                            </button>
+                        </div>
+
+                        {activeCalculator === 'currency' && <CurrencyCalculator />}
+                        {activeCalculator === 'paypal' && <PaypalCalculator />}
+                        {activeCalculator === 'discount' && <DiscountCalculator />}
                     </>
                 )}
 
@@ -112,7 +183,7 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                                 </div>
                                 <div className="grid grid-cols-1 gap-4">
                                     {banks.map((bank, index) => (
-                                        <BankCard key={bank.id} bank={bank} onDelete={onDelete} index={index} compact={false} />
+                                        <BankCard key={bank.id} bank={bank} onDelete={onDelete} onEdit={onEditClick} index={index} compact={banks.length > 3} />
                                     ))}
                                 </div>
                             </>
@@ -127,13 +198,31 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                             <h2 className="text-on-surface font-h2 text-h2">Historial de Tasas</h2>
                             <p className="text-on-surface-variant font-body-sm text-body-sm">Calendario y tendencia del dólar</p>
                         </section>
-                        <RateHistoryChart />
+                        <Suspense fallback={
+                            <div className="glass-surface rounded-2xl p-md h-64 flex items-center justify-center">
+                                <div className="text-center text-outline">
+                                    <span className="material-symbols-outlined text-3xl animate-pulse mb-2 block">show_chart</span>
+                                    <p className="text-sm">Cargando gráficos...</p>
+                                </div>
+                            </div>
+                        }>
+                            <RateHistoryChart />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ═══════ SHOPPING TAB ═══════ */}
                 {activeTab === 'shopping' && (
-                    <ShoppingList />
+                    <Suspense fallback={
+                        <div className="glass-surface rounded-2xl p-md h-64 flex items-center justify-center">
+                            <div className="text-center text-outline">
+                                <span className="material-symbols-outlined text-3xl animate-pulse mb-2 block">shopping_cart</span>
+                                <p className="text-sm">Cargando lista...</p>
+                            </div>
+                        </div>
+                    }>
+                        <ShoppingList />
+                    </Suspense>
                 )}
 
                 {/* ═══════ PROFILE TAB ═══════ */}
@@ -187,6 +276,28 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                             ))}
                         </div>
 
+                        {/* Backup Section */}
+                        <section className="mb-8">
+                            <h3 className="text-on-surface font-h3 text-h3 flex items-center gap-2 mb-4">
+                                <span className="material-symbols-outlined text-emerald">save</span>
+                                Respaldo de Datos
+                            </h3>
+                            <div className="glass-surface rounded-xl p-4 space-y-3">
+                                <p className="text-outline text-xs mb-2">Exporta tus cuentas y tu historial para no perderlos, o restaura un respaldo anterior.</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={handleExportData} className="btn-glass btn-glass-secondary flex items-center justify-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">download</span>
+                                        Exportar
+                                    </button>
+                                    <label className="btn-glass btn-glass-primary flex items-center justify-center gap-2 cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">upload</span>
+                                        Importar
+                                        <input type="file" accept=".json" className="hidden" onChange={handleImportData} />
+                                    </label>
+                                </div>
+                            </div>
+                        </section>
+
                         {/* HISTORIAL SECCION (Movido al perfil) */}
                         <section className="mb-4">
                             <h3 className="text-on-surface font-h3 text-h3 flex items-center gap-2">
@@ -235,7 +346,7 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                         {/* Footer in profile */}
                         <div className="mt-8 text-center space-y-2">
                             <p className="text-outline text-xs">Diseñado y desarrollado por <span className="text-primary font-bold">ARTKING47</span></p>
-                            <p className="text-outline-variant text-[10px]">© 2024 Pago Móvil Pocket. Secure Transaction Data.</p>
+                            <p className="text-outline-variant text-[10px]">© {new Date().getFullYear()} Pago Móvil Pocket. Secure Transaction Data.</p>
                             <div className="flex justify-center">
                                 <div className="flex items-center gap-1.5 bg-primary/5 px-2.5 py-1 rounded-full border border-primary/20">
                                     <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
@@ -251,7 +362,7 @@ function Dashboard({ banks, onAddClick, onDelete, appVersion, activeTab, onTabCh
                     <footer className="flex flex-col items-center gap-4 w-full px-5 pb-12 text-center mt-xl border-t border-white/5 pt-8">
                         <div className="space-y-1">
                             <p className="font-body-sm text-outline text-xs">Diseñado y desarrollado por <span className="text-primary font-bold">ARTKING47</span></p>
-                            <p className="font-body-sm text-outline-variant text-[10px]">© 2024 Pago Móvil Pocket. Secure Transaction Data.</p>
+                            <p className="font-body-sm text-outline-variant text-[10px]">© {new Date().getFullYear()} Pago Móvil Pocket. Secure Transaction Data.</p>
                         </div>
                         <div className="flex items-center gap-1.5 bg-primary/5 px-2.5 py-1 rounded-full border border-primary/20">
                             <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>

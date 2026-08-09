@@ -67,25 +67,39 @@ function PriceScanner({ onScan, onClose }) {
             
             const { data: { text } } = await Tesseract.recognize(
                 imgData,
-                'eng',
+                'spa',  // BUG-16 fix: Spanish for Venezuelan price tags
                 { logger: m => console.log(m) }
             );
 
-            // Matches numbers like 14.50 or 1,200.00
-            const priceMatch = text.match(/\d+([.,]\d+)?/);
+            // BUG-17 fix: Find all price-like numbers and pick the largest one
+            // Matches: 14,50 | 1.200,00 | 14.50 | 1200
+            const allMatches = [...text.matchAll(/(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:\.\d{1,2})?)(?!\d)/g)];
             
-            if (priceMatch) {
-                let numStr = priceMatch[0];
-                
-                // Extraer un posible nombre eliminando el precio y caracteres raros
-                let nameStr = text.replace(numStr, '').replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
-                // Tomar las primeras 3 palabras para que no quede un nombre gigante y ruidoso
-                nameStr = nameStr.split(/\s+/).filter(w => w.length > 1).slice(0, 3).join(' ');
-                
-                // Si no logró extraer un nombre válido, ponemos uno por defecto
-                if (!nameStr) nameStr = 'Producto';
-                
-                onScan({ price: numStr, name: nameStr });
+            if (allMatches.length > 0) {
+                // Parse each match, pick the one with the highest value (most likely the price)
+                let bestMatch = null;
+                let bestValue = 0;
+                for (const m of allMatches) {
+                    let numStr = m[0];
+                    // Venezuelan format: 1.200,50 → replace dots, then comma to dot
+                    let parsed = parseFloat(numStr.replace(/\./g, '').replace(',', '.'));
+                    if (!isNaN(parsed) && parsed > bestValue) {
+                        bestValue = parsed;
+                        bestMatch = numStr;
+                    }
+                }
+            
+                if (bestMatch) {
+                    // Extract product name from remaining text
+                    let nameStr = text.replace(bestMatch, '').replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+                    nameStr = nameStr.split(/\s+/).filter(w => w.length > 1).slice(0, 3).join(' ');
+                    if (!nameStr) nameStr = 'Producto';
+                    
+                    onScan({ price: bestMatch, name: nameStr });
+                } else {
+                    setStatus('No encontré un precio claro. Intenta otra vez.');
+                    setScanning(false);
+                }
             } else {
                 setStatus('No encontré un precio claro. Intenta otra vez.');
                 setScanning(false);

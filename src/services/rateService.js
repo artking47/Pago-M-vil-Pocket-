@@ -71,7 +71,11 @@ class RateService {
         this._loading = true;
         this._historicalData = [];
         this._started = false;
-        this._eventSource = null;
+        this._pollingInterval = null;
+        // Cross-rate cache (EUR, COP, PEN) — refreshed once per hour
+        this._crossRateCache = null;
+        this._crossRateCacheTime = 0;
+        this._fetchingLive = false; // guard against concurrent fetches
     }
 
     // ── Event system ──
@@ -93,21 +97,21 @@ class RateService {
     get loading() { return this._loading; }
     get historicalData() { return [...this._historicalData]; }
 
-    // ── Start Service ──
+    // ── Start Service ── Single init flow: cache → historical → live → poll
     start() {
         if (this._started) return;
         this._started = true;
         this._loadCached();
-        this.fetchLiveRates(); // Initial fetch
+        // Single init flow: fetch historical first, which then triggers fetchLiveRates
         this.fetchHistoricalRates();
-        this.connectBackend();
+        this._startPolling();
     }
 
     stop() {
         this._started = false;
-        if (this._eventSource) {
-            this._eventSource.close();
-            this._eventSource = null;
+        if (this._pollingInterval) {
+            clearInterval(this._pollingInterval);
+            this._pollingInterval = null;
         }
     }
 
@@ -143,32 +147,15 @@ class RateService {
         return `${y}-${m}-${dd}`;
     }
 
-    // ── Backend connection (HTTP Polling) ──
-    connectBackend() {
+    // ── Polling (every 3 minutes — BCV rates change once daily) ──
+    _startPolling() {
         if (this._pollingInterval) {
             clearInterval(this._pollingInterval);
         }
-
-        const fetchLiveRates = async () => {
-            try {
-                // In Netlify, it routes to /.netlify/functions/rates
-                const apiUrl = '/.netlify/functions/rates';
-                    
-                const res = await fetch(apiUrl);
-                if (res.ok) {
-                    const data = await res.json();
-                    this._processBackendData(data);
-                }
-            } catch (err) {
-                console.warn('Backend polling error:', err);
-            }
-        };
-
-        // Fetch immediately
-        fetchLiveRates();
-        
-        // Then poll every 30 seconds
-        this._pollingInterval = setInterval(fetchLiveRates, 30000);
+        // Poll every 3 minutes (180000ms) instead of 30s to avoid API rate limiting
+        this._pollingInterval = setInterval(() => {
+            this.fetchLiveRates();
+        }, 180000);
     }
 
     // ── Process Backend Data ──
@@ -179,10 +166,13 @@ class RateService {
         const dayOfWeek = getVenezuelaDayOfWeek();
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
         
-        this._previousRates = {
-            oficial: this._todayRates.oficial,
-            paralelo: this._todayRates.paralelo,
-        };
+        // BUG-03 fix: Only save previousRates when current rates are valid and different
+        if (this._todayRates.oficial > 0) {
+            this._previousRates = {
+                oficial: this._todayRates.oficial,
+                paralelo: this._todayRates.paralelo,
+            };
+        }
 
         let newTodayRates = { oficial: 0, paralelo: 0, eur: 0, cop: 0, pen: 0 };
         let newTomorrowRates = { oficial: 0, paralelo: 0, eur: 0, cop: 0, pen: 0 };
@@ -256,27 +246,20 @@ class RateService {
             }
         }
 
-        // Cross rates from external API (only updated on full fetch or when needed)
-        // For SSE updates, we use previous cross rates and recalculate them based on the new official rate
-        try {
-            const eurRes = await fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json());
-            if (eurRes?.rates) {
-                const eurToUsd = eurRes.rates.EUR;
-                const usdToCop = eurRes.rates.COP;
-                const usdToPen = eurRes.rates.PEN;
-
-                if (newTodayRates.oficial > 0) {
-                    if (eurToUsd) newTodayRates.eur = newTodayRates.oficial / eurToUsd;
-                    if (usdToCop) newTodayRates.cop = usdToCop;
-                    if (usdToPen) newTodayRates.pen = usdToPen;
-                }
-                if (newTomorrowRates.oficial > 0) {
-                    if (eurToUsd) newTomorrowRates.eur = newTomorrowRates.oficial / eurToUsd;
-                    if (usdToCop) newTomorrowRates.cop = usdToCop;
-                    if (usdToPen) newTomorrowRates.pen = usdToPen;
-                }
+        // Cross rates — cached for 1 hour to avoid API rate limiting
+        const crossRates = await this._getCrossRates();
+        if (crossRates) {
+            if (newTodayRates.oficial > 0) {
+                if (crossRates.EUR) newTodayRates.eur = newTodayRates.oficial / crossRates.EUR;
+                if (crossRates.COP) newTodayRates.cop = crossRates.COP;
+                if (crossRates.PEN) newTodayRates.pen = crossRates.PEN;
             }
-        } catch (e) {
+            if (newTomorrowRates.oficial > 0) {
+                if (crossRates.EUR) newTomorrowRates.eur = newTomorrowRates.oficial / crossRates.EUR;
+                if (crossRates.COP) newTomorrowRates.cop = crossRates.COP;
+                if (crossRates.PEN) newTomorrowRates.pen = crossRates.PEN;
+            }
+        } else {
             // Keep old cross rates if fetch fails
             newTodayRates.eur = this._todayRates.eur;
             newTodayRates.cop = this._todayRates.cop;
@@ -308,15 +291,33 @@ class RateService {
         this._emit('loading', false);
     }
 
+    // ── Fetch cross-rates with 1-hour cache ──
+    async _getCrossRates() {
+        const ONE_HOUR = 3600000;
+        const now = Date.now();
+        if (this._crossRateCache && (now - this._crossRateCacheTime) < ONE_HOUR) {
+            return this._crossRateCache;
+        }
+        try {
+            const eurRes = await fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json());
+            if (eurRes?.rates) {
+                this._crossRateCache = eurRes.rates;
+                this._crossRateCacheTime = now;
+                return eurRes.rates;
+            }
+        } catch { /* ignore */ }
+        return this._crossRateCache || null;
+    }
+
     // ── Fetch live rates manually ──
     async fetchLiveRates() {
+        // Guard against concurrent fetches (race condition fix)
+        if (this._fetchingLive) return;
+        this._fetchingLive = true;
         this._loading = true;
         this._emit('loading', true);
         try {
-            const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? '/.netlify/functions/rates'
-                : '/.netlify/functions/rates';
-            const res = await fetch(apiUrl);
+            const res = await fetch('/.netlify/functions/rates');
             if (res.ok) {
                 const data = await res.json();
                 await this._processBackendData(data);
@@ -325,6 +326,8 @@ class RateService {
             this._loadCached();
             this._emit('error', err);
             this._emit('loading', false);
+        } finally {
+            this._fetchingLive = false;
         }
     }
 

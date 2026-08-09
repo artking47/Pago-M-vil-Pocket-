@@ -59,7 +59,8 @@ exports.handler = async function(event, context) {
             statusCode: 200,
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*' // Allow frontend to call it directly
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'public, max-age=60, s-maxage=120'
             },
             body: JSON.stringify({
                 oficial: bcv.rate,

@@ -37,6 +37,7 @@ function CurrencyCalculator() {
     const [activeTool, setActiveTool] = useState('mixto'); // 'mixto' | 'split'
     const [cashGiven, setCashGiven] = useState('');
     const [splitWays, setSplitWays] = useState(2);
+    const [tipPercent, setTipPercent] = useState(10);
     const [showMostrador, setShowMostrador] = useState(false);
 
     // Rate change animation
@@ -346,9 +347,15 @@ function CurrencyCalculator() {
                                 Mañana ({getTomorrowDate()})
                             </button>
                         </div>
-                        <p className={`text-primary font-numeral-display text-h2 pt-1 truncate transition-all duration-300 ${flashClass}`}>
-                            1 {selectedCurrency} = {displayRate > 0 ? displayRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—'} {displayTargetSymbol}
-                        </p>
+                        <div className="pt-1">
+                            {loading ? (
+                                <div className="h-8 w-48 bg-white/10 animate-pulse rounded-md mt-1"></div>
+                            ) : (
+                                <p className={`text-primary font-numeral-display text-h2 truncate transition-all duration-300 ${flashClass}`}>
+                                    1 {selectedCurrency} = {displayRate > 0 ? displayRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—'} {displayTargetSymbol}
+                                </p>
+                            )}
+                        </div>
                         {rateView === 'manana' && !hasTomorrowRate && (
                             <p className="text-[10px] text-secondary">Aún no se ha publicado la tasa de mañana</p>
                         )}
@@ -397,6 +404,30 @@ function CurrencyCalculator() {
                             </p>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* Spread Widget (BCV vs Paralelo) */}
+            {mode === 'api' && todayRates.oficial > 0 && todayRates.paralelo > 0 && (
+                <div className="glass-surface p-3 rounded-xl flex items-center justify-between mt-1">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline-variant text-sm">compare_arrows</span>
+                        <span className="text-[11px] font-bold text-outline uppercase tracking-wider">Spread BCV / Paralelo</span>
+                    </div>
+                    {(() => {
+                        const spread = ((todayRates.paralelo - todayRates.oficial) / todayRates.oficial) * 100;
+                        const isPositive = spread > 0;
+                        return (
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[12px] font-bold ${isPositive ? 'text-red-400' : 'text-green-400'}`}>
+                                    {isPositive ? '+' : ''}{spread.toFixed(2)}%
+                                </span>
+                                <span className="text-[10px] text-outline font-medium px-2 py-0.5 bg-white/5 rounded-md">
+                                    Bs. {Math.abs(todayRates.paralelo - todayRates.oficial).toFixed(2)}
+                                </span>
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 
@@ -484,9 +515,10 @@ function CurrencyCalculator() {
                 {/* Extra Tools Section */}
                 <div className={`transition-all duration-400 ease-in-out overflow-hidden ${showTools ? 'max-h-[300px] opacity-100 pt-2' : 'max-h-0 opacity-0'}`}>
                     <div className="glass-surface border border-white/5 rounded-xl p-3">
-                        <div className="flex gap-2 mb-3 bg-white/5 p-1 rounded-lg">
-                            <button onClick={() => setActiveTool('mixto')} className={`flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'mixto' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Mixto / Vuelto</button>
-                            <button onClick={() => setActiveTool('split')} className={`flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'split' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Dividir Cuenta</button>
+                        <div className="flex gap-1 mb-3 bg-white/5 p-1 rounded-lg">
+                            <button onClick={() => setActiveTool('mixto')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'mixto' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Mixto/Vuelto</button>
+                            <button onClick={() => setActiveTool('split')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'split' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Dividir</button>
+                            <button onClick={() => setActiveTool('propina')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'propina' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Propina</button>
                         </div>
 
                         {activeTool === 'mixto' && (
@@ -552,6 +584,46 @@ function CurrencyCalculator() {
                                         <div className="bg-white/5 border border-white/10 p-3 rounded-lg text-center mt-2">
                                             <span className="text-[10px] text-outline uppercase font-bold tracking-widest block mb-1">A cada uno le toca</span>
                                             <span className="font-numeral-display text-2xl text-on-surface">{toSymbol} {formatted}</span>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
+                        {activeTool === 'propina' && (
+                            <div className="space-y-3 animate-fade-in-up">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[11px] font-bold text-outline">Porcentaje sugerido</label>
+                                    <div className="flex gap-2">
+                                        {[5, 10, 15].map(pct => (
+                                            <button key={pct} onClick={() => setTipPercent(pct)} className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${tipPercent === pct ? 'bg-primary text-on-primary-fixed' : 'bg-white/10 text-outline hover:bg-white/20'}`}>
+                                                {pct}%
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {(() => {
+                                    const numResult = parseFloat(result.replace(/\./g, '').replace(',', '.'));
+                                    if (isNaN(numResult) || numResult === 0) return null;
+                                    const tipAmount = numResult * (tipPercent / 100);
+                                    const totalWithTip = numResult + tipAmount;
+                                    const formattedTip = tipAmount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    const formattedTotal = totalWithTip.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    return (
+                                        <div className="bg-white/5 border border-white/10 p-3 rounded-lg flex flex-col gap-2 mt-2">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-outline">Monto original:</span>
+                                                <span className="text-on-surface">{toSymbol} {result}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-outline">Propina ({tipPercent}%):</span>
+                                                <span className="text-on-surface">{toSymbol} {formattedTip}</span>
+                                            </div>
+                                            <div className="w-full h-px bg-white/10"></div>
+                                            <div className="flex justify-between items-center font-bold">
+                                                <span className="text-primary uppercase text-[10px] tracking-wider">Total a pagar:</span>
+                                                <span className="text-primary text-lg">{toSymbol} {formattedTotal}</span>
+                                            </div>
                                         </div>
                                     );
                                 })()}

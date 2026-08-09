@@ -3,11 +3,12 @@ import { getBankColor, getBankLogo, getBankInitials } from '../utils/storage';
 import {
     XIcon, ChevronUpIcon, ChevronDownIcon,
     CopyIcon, CheckIcon, ShareIcon,
-    IdCardIcon, PhoneIcon
+    IdCardIcon, PhoneIcon, EditIcon
 } from './Icons';
 
-function BankCard({ bank, onDelete, index, compact = false }) {
+function BankCard({ bank, onDelete, onEdit, index, compact = false }) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isMasked, setIsMasked] = useState(true);
     const [copied, setCopied] = useState(false);
     const [shared, setShared] = useState(false);
     const [monto, setMonto] = useState('');
@@ -68,7 +69,9 @@ function BankCard({ bank, onDelete, index, compact = false }) {
                         )}
                     </div>
                     <h3 className="text-xs font-bold leading-tight mb-1 line-clamp-2 text-on-surface">{bank.banco}</h3>
-                    <p className="text-[10px] truncate w-full text-outline">{bank.telefono}</p>
+                    <p className="text-[10px] truncate w-full text-outline font-mono">
+                        {isMasked ? bank.telefono.replace(/(\d{4})\d{5}(\d{2})/, '$1•••$2') : bank.telefono}
+                    </p>
                 </div>
             </div>
         );
@@ -81,11 +84,18 @@ function BankCard({ bank, onDelete, index, compact = false }) {
                 style={{ animationDelay: `${index * 100}ms` }}>
                 <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{ background: bankColor }} />
 
-                <button onClick={(e) => { e.stopPropagation(); onDelete(bank.id); }}
-                    className="absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center z-10 transition-colors bg-danger-dim"
-                    aria-label="Eliminar">
-                    <XIcon className="w-4 h-4 text-coral" />
-                </button>
+                <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(bank); }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors bg-white/5 hover:bg-white/10"
+                        aria-label="Editar">
+                        <EditIcon className="w-4 h-4 text-emerald" />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(bank.id); }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors bg-danger-dim hover:bg-error/20"
+                        aria-label="Eliminar">
+                        <XIcon className="w-4 h-4 text-coral" />
+                    </button>
+                </div>
 
                 <div className="animate-slide-down">
                     <div className="flex items-center gap-4 mb-4 mt-1">
@@ -112,13 +122,35 @@ function BankCard({ bank, onDelete, index, compact = false }) {
 
                     <div className="divider-glass" />
 
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <span className="text-xs font-semibold text-on-surface-variant">Datos de la cuenta</span>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setIsMasked(!isMasked); }}
+                            className="text-[10px] flex items-center gap-1 font-bold text-emerald bg-emerald-dim px-2 py-1 rounded-full active:scale-95 transition-transform"
+                        >
+                            <span className="material-symbols-outlined text-[12px]">{isMasked ? 'visibility' : 'visibility_off'}</span>
+                            {isMasked ? 'Mostrar' : 'Ocultar'}
+                        </button>
+                    </div>
+
                     <div className="space-y-2.5 mb-4">
-                        {[{ icon: IdCardIcon, label: 'Cédula', value: bank.cedula }, { icon: PhoneIcon, label: 'Teléfono', value: bank.telefono }].map(({ icon: Icon, label, value }) => (
+                        {[
+                            { 
+                                icon: IdCardIcon, 
+                                label: 'Cédula', 
+                                value: isMasked ? bank.cedula.replace(/(\D?)\d+?(\d{3})$/, '$1••••$2') : bank.cedula 
+                            }, 
+                            { 
+                                icon: PhoneIcon, 
+                                label: 'Teléfono', 
+                                value: isMasked ? bank.telefono.replace(/(\d{4})\d{5}(\d{2})/, '$1•••$2') : bank.telefono 
+                            }
+                        ].map(({ icon: Icon, label, value }) => (
                             <div key={label} className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04]">
                                 <Icon className="w-5 h-5 flex-shrink-0 text-emerald" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs text-outline">{label}</p>
-                                    <p className="data-value truncate">{value}</p>
+                                    <p className={`data-value truncate ${isMasked ? 'font-mono tracking-wider text-sm' : ''}`}>{value}</p>
                                 </div>
                             </div>
                         ))}

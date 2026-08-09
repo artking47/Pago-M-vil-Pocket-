@@ -26,7 +26,7 @@
   </noscript>
   <title>Pago Móvil Pocket</title>
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://bcv-api.rafnixg.dev https://open.er-api.com https://ve.dolarapi.com https://fonts.googleapis.com https://fonts.gstatic.com">
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://open.er-api.com https://ve.dolarapi.com https://fonts.googleapis.com https://fonts.gstatic.com">
   <!-- Splash screen nativo: fondo negro inmediato para evitar flash blanco -->
   <style>
     html,
@@ -67,21 +67,6 @@
     </div>
   </div>
   <script type="module" src="/src/main.jsx"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(registration => console.log('SW registrado'))
-          .catch(err => console.log('Error SW:', err));
-      });
-    }
-    window.addEventListener('beforeunload', (e) => {
-      if (localStorage.getItem('pago_movil_data')) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    });
-  </script>
 </body>
 
 </html>

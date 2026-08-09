@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { APP_VERSION } from '../version';
 
 function SplashScreen({ onFinish }) {
     const [phase, setPhase] = useState(0);
@@ -10,8 +11,9 @@ function SplashScreen({ onFinish }) {
         return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }, [onFinish]);
 
-    // Detect system preference for light/dark
-    const prefersDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // BUG-07 fix: Read saved theme from localStorage first, fall back to system preference
+    const savedTheme = typeof window !== 'undefined' && localStorage.getItem('pago_movil_theme');
+    const prefersDark = savedTheme ? savedTheme === 'dark' : (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const bg = prefersDark ? '#0d0f1c' : '#f0f4ff';
     const textColor = prefersDark ? '#e0e6f7' : '#1a1d30';
     const subtextColor = prefersDark ? 'rgba(224,230,247,0.5)' : 'rgba(26,29,48,0.5)';
@@ -93,7 +95,7 @@ function SplashScreen({ onFinish }) {
                 {/* Version */}
                 <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-500 delay-100 ${phase >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                     style={{ background: prefersDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)', border: prefersDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)' }}>
-                    <span className="text-xs font-medium" style={{ color: mutedColor }}>v0.1.0</span>
+                    <span className="text-xs font-medium" style={{ color: mutedColor }}>{APP_VERSION}</span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
                         style={{ background: `rgba(66, 133, 244, 0.15)`, color: accentColor, border: `1px solid rgba(66, 133, 244, 0.25)` }}>
                         Beta
