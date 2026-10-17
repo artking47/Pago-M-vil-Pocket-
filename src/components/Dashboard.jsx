@@ -27,42 +27,86 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
     };
 
     const handleExportData = () => {
-        const banksData = localStorage.getItem('pago_movil_data') || '[]';
-        const historyData = localStorage.getItem('pago_movil_history') || '[]';
-        
-        const backup = {
-            version: appVersion,
-            date: new Date().toISOString(),
-            banks: JSON.parse(banksData),
-            history: JSON.parse(historyData)
-        };
+        try {
+            const banksData = localStorage.getItem('pago_movil_data') || '[]';
+            const historyData = localStorage.getItem('pm_pocket_conversion_history') || '[]';
+            const shoppingItems = localStorage.getItem('shoppingListItems') || '[]';
+            const shoppingSaved = localStorage.getItem('shoppingSavedLists') || '[]';
+            
+            const backup = {
+                version: appVersion,
+                date: new Date().toISOString(),
+                banks: JSON.parse(banksData),
+                history: JSON.parse(historyData),
+                shoppingItems: JSON.parse(shoppingItems),
+                shoppingSavedLists: JSON.parse(shoppingSaved)
+            };
 
-        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `pago-movil-backup-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pago-movil-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Export error:', err);
+            alert('Error al exportar los datos.');
+        }
     };
 
     const handleImportData = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        // Security check: Limit file size to 2MB to prevent memory exhaustion / DoS
+        if (file.size > 2 * 1024 * 1024) {
+            alert('El archivo es demasiado grande (máximo 2MB).');
+            e.target.value = '';
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
                 const data = JSON.parse(event.target.result);
-                if (data.banks) localStorage.setItem('pago_movil_data', JSON.stringify(data.banks));
-                if (data.history) localStorage.setItem('pago_movil_history', JSON.stringify(data.history));
+                if (typeof data !== 'object' || data === null) {
+                    throw new Error('Formato inválido');
+                }
+
+                // Validate and sanitize banks array
+                if (Array.isArray(data.banks)) {
+                    const validBanks = data.banks.filter(b => 
+                        b && typeof b === 'object' && typeof b.banco === 'string' && typeof b.cedula === 'string' && typeof b.telefono === 'string'
+                    );
+                    localStorage.setItem('pago_movil_data', JSON.stringify(validBanks));
+                }
+
+                // Validate and sanitize history (support both current and legacy keys)
+                const historyList = Array.isArray(data.history) 
+                    ? data.history 
+                    : (Array.isArray(data.conversionHistory) ? data.conversionHistory : null);
+                if (historyList) {
+                    const validHistory = historyList.filter(h => h && typeof h === 'object');
+                    localStorage.setItem('pm_pocket_conversion_history', JSON.stringify(validHistory));
+                }
+
+                // Validate shopping list
+                if (Array.isArray(data.shoppingItems)) {
+                    localStorage.setItem('shoppingListItems', JSON.stringify(data.shoppingItems));
+                }
+                if (Array.isArray(data.shoppingSavedLists)) {
+                    localStorage.setItem('shoppingSavedLists', JSON.stringify(data.shoppingSavedLists));
+                }
                 
                 alert('¡Datos restaurados con éxito! La aplicación se recargará.');
                 window.location.reload();
             } catch (err) {
-                alert('Error al leer el archivo de respaldo. Asegúrate de que sea un archivo válido.');
+                alert('Error al leer el archivo de respaldo. Asegúrate de que sea un archivo JSON válido.');
+            } finally {
+                e.target.value = '';
             }
         };
         reader.readAsText(file);
@@ -80,19 +124,23 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
 
     return (
         <div className="font-body-md overflow-x-hidden min-h-screen">
-            {/* TOP APP BAR — with actual logo */}
-            <header className="bg-surface/60 dark:bg-surface/60 backdrop-blur-md border-b border-white/5 dark:border-white/5 fixed top-0 left-0 right-0 flex justify-between items-center w-full px-5 py-3 h-16 z-50">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-200 active:scale-95 bg-white/5">
-                        <img src={logoSrc} alt="Pago Móvil Pocket" className="w-9 h-9 object-contain" />
+            {/* TOP APP BAR */}
+            <header className="app-bar fixed top-0 left-0 right-0 z-50">
+                <div className="max-w-3xl mx-auto flex justify-between items-center w-full px-5 h-16">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-[14px] p-[2px] bg-gradient-to-br from-primary/50 via-white/15 to-secondary/40 shrink-0 shadow-sm">
+                            <div className="w-full h-full rounded-[12px] bg-surface-container/90 backdrop-blur-md flex items-center justify-center overflow-hidden">
+                                <img src={logoSrc} alt="Pago Móvil Pocket" width="32" height="32" className="w-7 h-7 object-contain" />
+                            </div>
+                        </div>
+                        <div className="min-w-0">
+                            <h1 className="text-on-surface text-[17px] font-bold tracking-[-0.02em] leading-tight truncate">Pago Móvil Pocket</h1>
+                            <p className="text-[10px] text-outline font-semibold tracking-[0.08em] uppercase leading-tight mt-0.5">{appVersion}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-on-surface text-lg font-bold font-['Inter'] tracking-tight">Pago Móvil Pocket</h1>
-                        <p className="text-[10px] text-outline font-medium tracking-wide">{appVersion}</p>
+                    <div className="flex items-center gap-2">
+                        <ThemeToggle />
                     </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <ThemeToggle />
                 </div>
             </header>
 
@@ -103,33 +151,32 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 {/* ═══════ CALCULATOR TAB ═══════ */}
                 {activeTab === 'calculator' && (
                     <>
-                        <section className="mb-4 pt-4 animate-fade-in-up">
-                            <h2 className="text-on-surface font-h2 text-h2">Herramientas</h2>
-                            <p className="text-on-surface-variant font-body-sm text-body-sm">Calculadoras útiles para tus finanzas</p>
+                        <section className="pt-2 animate-fade-in-up">
+                            <span className="eyebrow mb-3"><span className="eyebrow-dot" />Herramientas</span>
+                            <h2 className="text-on-surface text-[28px] font-bold tracking-[-0.03em] leading-[1.1]">Tus finanzas,<br /><span className="text-outline">al instante.</span></h2>
                         </section>
 
-                        <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar animate-fade-in-up">
-                            <button 
-                                onClick={() => setActiveCalculator('currency')}
-                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 ${activeCalculator === 'currency' ? 'bg-primary text-on-primary-fixed shadow-lg shadow-primary/20' : 'glass-surface text-outline hover:text-on-surface'}`}
-                            >
-                                <span className="material-symbols-outlined text-[18px]">currency_exchange</span>
-                                <span className="text-[12px] font-bold tracking-wide">Divisas</span>
-                            </button>
-                            <button 
-                                onClick={() => setActiveCalculator('paypal')}
-                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 ${activeCalculator === 'paypal' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'glass-surface text-outline hover:text-on-surface'}`}
-                            >
-                                <span className="material-symbols-outlined text-[18px]">payments</span>
-                                <span className="text-[12px] font-bold tracking-wide">PayPal</span>
-                            </button>
-                            <button 
-                                onClick={() => setActiveCalculator('discount')}
-                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 ${activeCalculator === 'discount' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'glass-surface text-outline hover:text-on-surface'}`}
-                            >
-                                <span className="material-symbols-outlined text-[18px]">sell</span>
-                                <span className="text-[12px] font-bold tracking-wide">Descuentos</span>
-                            </button>
+                        <div className="well grid grid-cols-3 gap-1 p-1 rounded-[18px] animate-fade-in-up" role="tablist" aria-label="Calculadoras">
+                            {[
+                                { id: 'currency', icon: 'currency_exchange', label: 'Divisas' },
+                                { id: 'paypal', icon: 'payments', label: 'PayPal' },
+                                { id: 'discount', icon: 'sell', label: 'Descuentos' },
+                            ].map(tool => {
+                                const isActive = activeCalculator === tool.id;
+                                return (
+                                    <button
+                                        key={tool.id}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={isActive}
+                                        onClick={() => setActiveCalculator(tool.id)}
+                                        className={`press flex items-center justify-center gap-1.5 h-11 rounded-[14px] transition-[background-color,color,box-shadow] duration-200 ${isActive ? 'thumb-primary' : 'text-outline hover:text-on-surface'}`}
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]" style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}>{tool.icon}</span>
+                                        <span className="text-[12px] font-bold tracking-tight">{tool.label}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
 
                         {activeCalculator === 'currency' && <CurrencyCalculator />}
@@ -141,9 +188,10 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 {/* ═══════ ACCOUNTS TAB ═══════ */}
                 {activeTab === 'accounts' && (
                     <div className="animate-fade-in-up">
-                        <section className="mb-6 pt-4">
-                            <h2 className="text-on-surface font-h2 text-h2">Mis Cuentas</h2>
-                            <p className="text-on-surface-variant font-body-sm text-body-sm">Gestiona tus cuentas de Pago Móvil</p>
+                        <section className="mb-6 pt-2">
+                            <span className="eyebrow mb-3"><span className="eyebrow-dot" />Pago Móvil</span>
+                            <h2 className="text-on-surface text-[28px] font-bold tracking-[-0.03em] leading-[1.1]">Mis Cuentas</h2>
+                            <p className="text-on-surface-variant text-sm mt-1">Toca una tarjeta para copiar o compartir sus datos</p>
                         </section>
 
                         {banks.length === 0 ? (
@@ -174,10 +222,12 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                             <>
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <span className="bg-white/10 text-on-surface-variant text-[11px] px-2 py-0.5 rounded-full font-bold">{banks.length} cuenta{banks.length > 1 ? 's' : ''}</span>
+                                        <span className="well text-on-surface-variant text-[11px] px-2.5 py-1 rounded-full font-bold">{banks.length} cuenta{banks.length > 1 ? 's' : ''}</span>
                                     </div>
-                                    <button onClick={onAddClick} className="text-primary hover:text-on-surface transition-colors text-sm font-bold flex items-center gap-1 active:scale-95">
-                                        <span className="material-symbols-outlined text-sm">add</span>
+                                    <button onClick={onAddClick} className="press thumb-primary h-9 pl-2 pr-4 rounded-full text-[13px] font-bold flex items-center gap-1.5">
+                                        <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-[16px]">add</span>
+                                        </span>
                                         Agregar
                                     </button>
                                 </div>
@@ -194,9 +244,10 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 {/* ═══════ RATES / TASAS TAB ═══════ */}
                 {activeTab === 'rates' && (
                     <div className="animate-fade-in-up">
-                        <section className="mb-4 pt-4">
-                            <h2 className="text-on-surface font-h2 text-h2">Historial de Tasas</h2>
-                            <p className="text-on-surface-variant font-body-sm text-body-sm">Calendario y tendencia del dólar</p>
+                        <section className="mb-4 pt-2">
+                            <span className="eyebrow mb-3"><span className="eyebrow-dot" />Mercado</span>
+                            <h2 className="text-on-surface text-[28px] font-bold tracking-[-0.03em] leading-[1.1]">Historial de Tasas</h2>
+                            <p className="text-on-surface-variant text-sm mt-1">Calendario y tendencia BCV y USDT</p>
                         </section>
                         <Suspense fallback={
                             <div className="glass-surface rounded-2xl p-md h-64 flex items-center justify-center">
@@ -228,31 +279,36 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 {/* ═══════ PROFILE TAB ═══════ */}
                 {activeTab === 'profile' && (
                     <div className="animate-fade-in-up">
-                        <section className="mb-6 pt-4">
-                            <h2 className="text-on-surface font-h2 text-h2">Perfil</h2>
-                            <p className="text-on-surface-variant font-body-sm text-body-sm">Información de la aplicación</p>
+                        <section className="mb-6 pt-2">
+                            <span className="eyebrow mb-3"><span className="eyebrow-dot" />Cuenta</span>
+                            <h2 className="text-on-surface text-[28px] font-bold tracking-[-0.03em] leading-[1.1]">Perfil</h2>
+                            <p className="text-on-surface-variant text-sm mt-1">Información de la aplicación</p>
                         </section>
 
                         {/* App Info Card */}
-                        <section className="glass-surface rounded-2xl p-6 flex flex-col items-center text-center gap-4 mb-4">
-                            <div className="w-24 h-24 rounded-2xl overflow-hidden bg-white/5 p-2">
-                                <img src={logoSrc} alt="Pago Móvil Pocket" className="w-full h-full object-contain" />
-                            </div>
-                            <div>
-                                <h3 className="text-on-surface font-h3 text-h3">Pago Móvil Pocket</h3>
-                                <p className="text-outline text-sm">{appVersion}</p>
-                            </div>
-                        </section>
+                        <div className="bezel mb-4">
+                            <section className="bezel-core card-sheen p-6 flex flex-col items-center text-center gap-4">
+                                <div className="w-24 h-24 rounded-[26px] p-[3px] bg-gradient-to-br from-primary/50 via-white/5 to-secondary/40">
+                                    <div className="w-full h-full rounded-[23px] bg-surface-container p-2 flex items-center justify-center">
+                                        <img src={logoSrc} alt="Pago Móvil Pocket" className="w-full h-full object-contain" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 className="text-on-surface text-xl font-bold tracking-tight">Pago Móvil Pocket</h3>
+                                    <p className="text-outline text-xs font-semibold uppercase tracking-[0.12em] mt-1">{appVersion}</p>
+                                </div>
+                            </section>
+                        </div>
 
                         {/* Stats */}
                         <div className="grid grid-cols-2 gap-3 mb-4">
-                            <div className="glass-surface rounded-xl p-4 text-center">
-                                <p className="text-primary font-bold text-2xl">{banks.length}</p>
-                                <p className="text-outline text-xs font-medium mt-1">Cuentas guardadas</p>
+                            <div className="card-glass card-sheen p-4">
+                                <p className="text-outline text-[10px] font-bold uppercase tracking-[0.14em]">Cuentas</p>
+                                <p className="text-primary font-bold text-3xl tracking-tight mt-1">{banks.length}</p>
                             </div>
-                            <div className="glass-surface rounded-xl p-4 text-center">
-                                <p className="text-secondary font-bold text-2xl">{history.length}</p>
-                                <p className="text-outline text-xs font-medium mt-1">Conversiones</p>
+                            <div className="card-glass card-sheen p-4">
+                                <p className="text-outline text-[10px] font-bold uppercase tracking-[0.14em]">Conversiones</p>
+                                <p className="text-secondary font-bold text-3xl tracking-tight mt-1">{history.length}</p>
                             </div>
                         </div>
 
@@ -330,12 +386,12 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                                     return (
                                         <div key={item.id || index} className="glass-surface p-3 rounded-xl flex items-center justify-between">
                                             <div>
-                                                <p className="text-on-surface font-semibold text-sm">{getSymbol(item.fromCode)} {item.fromAmount || '—'}</p>
+                                                <p className="text-on-surface font-semibold text-sm">{getSymbol(item.fromCode)} {item.fromAmount || '-'}</p>
                                                 <p className="text-outline text-[10px]">{time}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-primary font-bold text-sm">{getSymbol(item.toCode)} {item.toAmount || '—'}</p>
-                                                <p className="text-outline text-[10px]">Tasa: {item.rate || '—'}</p>
+                                                <p className="text-primary font-bold text-sm">{getSymbol(item.toCode)} {item.toAmount || '-'}</p>
+                                                <p className="text-outline text-[10px]">Tasa: {item.rate || '-'}</p>
                                             </div>
                                         </div>
                                     );
@@ -372,29 +428,26 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 )}
             </main>
 
-            {/* BOTTOM NAVBAR — Functional with active state */}
-            <nav className="bg-surface/80 backdrop-blur-xl border-t border-white/5 rounded-t-2xl fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 h-20 pb-safe">
+            {/* BOTTOM NAV: floating island */}
+            <nav className="nav-island grid grid-cols-5 gap-1" aria-label="Navegación principal">
                 {navItems.map((item) => {
                     const isActive = activeTab === item.id;
                     return (
                         <button
                             key={item.id}
                             onClick={() => onTabChange(item.id)}
-                            className={`flex flex-col items-center justify-center transition-all active:scale-90 relative ${isActive ? 'text-primary' : 'text-outline hover:text-primary'}`}
+                            aria-current={isActive ? 'page' : undefined}
+                            className={`press flex flex-col items-center justify-center h-14 rounded-[22px] transition-[background-color,color,box-shadow] duration-200 ${isActive ? 'nav-item-active-bg text-primary' : 'text-outline hover:text-on-surface'}`}
                         >
                             <span
-                                className="material-symbols-outlined"
-                                style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}
+                                className="material-symbols-outlined text-[22px] leading-none"
+                                style={isActive ? { fontVariationSettings: "'FILL' 1, 'wght' 500" } : { fontVariationSettings: "'wght' 400" }}
                             >{item.icon}</span>
-                            <span className="font-['Inter'] text-[10px] font-medium mt-1">{item.label}</span>
-                            {isActive && (
-                                <span className="absolute -bottom-1 w-1 h-1 bg-secondary rounded-full"></span>
-                            )}
+                            <span className={`text-[10px] mt-1 tracking-tight ${isActive ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
                         </button>
                     );
                 })}
             </nav>
-            <div className="h-20 w-full"></div>
         </div>
     );
 }

@@ -85,14 +85,23 @@ function App() {
 
                 {/* Modal de confirmación de eliminación */}
                 {showDeleteConfirm && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in-up">
-                        <div className="card-glass max-w-sm w-full p-6 text-center animate-slide-down">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-dialog-title"
+                        className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-overlay"
+                        onClick={() => setShowDeleteConfirm(null)}
+                    >
+                        <div
+                            className="card-glass max-w-sm w-full p-6 text-center animate-modal-enter shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-error/10 flex items-center justify-center">
                                 <svg className="w-8 h-8 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                                 </svg>
                             </div>
-                            <h3 className="text-xl font-bold mb-2 text-on-surface">
+                            <h3 id="delete-dialog-title" className="text-xl font-bold mb-2 text-on-surface">
                                 ¿Eliminar cuenta?
                             </h3>
                             <p className="text-sm mb-6 text-outline">

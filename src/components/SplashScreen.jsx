@@ -27,7 +27,7 @@ function SplashScreen({ onFinish }) {
             className={`fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden transition-opacity duration-400 ${phase === 2 ? 'opacity-0' : 'opacity-100'}`}
             style={{ background: bg }}
         >
-            {/* Orbs animados — Primary Blue + Secondary Gold */}
+            {/* Orbs animados: Primary Blue + Secondary Gold */}
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full splash-orb-1" />
                 <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full splash-orb-2" />
@@ -102,7 +102,7 @@ function SplashScreen({ onFinish }) {
                     </span>
                 </div>
 
-                {/* Loading dots — Primary blue */}
+                {/* Loading dots: Primary blue */}
                 <div className={`flex justify-center gap-2 mt-8 transition-all duration-400 ${phase >= 1 ? 'opacity-100' : 'opacity-0'}`}>
                     {[0, 1, 2].map(i => (
                         <div key={i} className="w-2 h-2 rounded-full"

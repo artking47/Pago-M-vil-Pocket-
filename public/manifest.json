@@ -1,12 +1,15 @@
 {
+    "id": "/",
+    "scope": "/",
     "name": "Pago Móvil Pocket",
     "short_name": "PM Pocket",
-    "description": "Gestiona tus datos de Pago Móvil de forma simple y rápida — por ARTKING47",
+    "description": "Gestiona tus datos de Pago Móvil de forma simple y rápida - por ARTKING47",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#0d0f1c",
     "theme_color": "#0d0f1c",
     "orientation": "portrait-primary",
+    "categories": ["finance", "utilities"],
     "icons": [
         {
             "src": "/isotipo-splash.png",

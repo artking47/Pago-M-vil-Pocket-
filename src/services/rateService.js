@@ -1,5 +1,5 @@
 /**
- * Rate Service — Centralized rate management with real-time updates
+ * Rate Service: Centralized rate management with real-time updates
  * Connects to the local Express backend via SSE for instant updates
  */
 
@@ -63,16 +63,16 @@ export function getNextBusinessDayDateStr() {
 class RateService {
     constructor() {
         this._emitter = new EventTarget();
-        this._todayRates = { oficial: 0, paralelo: 0, usdtCompra: 0, usdtVenta: 0, eur: 0, cop: 0, pen: 0 };
-        this._tomorrowRates = { oficial: 0, paralelo: 0, usdtCompra: 0, usdtVenta: 0, eur: 0, cop: 0, pen: 0 };
-        this._previousRates = { oficial: 0, paralelo: 0 };
+        this._todayRates = { oficial: 0, oficialDate: null, usdt: 0, usdtCompra: 0, usdtVenta: 0, eur: 0, cop: 0, pen: 0, paralelo: 0 };
+        this._tomorrowRates = { oficial: 0, oficialDate: null, usdt: 0, usdtCompra: 0, usdtVenta: 0, eur: 0, cop: 0, pen: 0, paralelo: 0 };
+        this._previousRates = { oficial: 0, usdt: 0, paralelo: 0 };
         this._hasTomorrowRate = false;
         this._lastUpdate = null;
         this._loading = true;
         this._historicalData = [];
         this._started = false;
         this._pollingInterval = null;
-        // Cross-rate cache (EUR, COP, PEN) — refreshed once per hour
+        // Cross-rate cache (EUR, COP, PEN): refreshed once per hour
         this._crossRateCache = null;
         this._crossRateCacheTime = 0;
         this._fetchingLive = false; // guard against concurrent fetches
@@ -149,7 +149,7 @@ class RateService {
         return `${y}-${m}-${dd}`;
     }
 
-    // ── Polling (every 3 minutes — BCV rates change once daily) ──
+    // ── Polling (every 3 minutes, BCV rates change once daily) ──
     _startPolling() {
         if (this._pollingInterval) {
             clearInterval(this._pollingInterval);
@@ -172,12 +172,13 @@ class RateService {
         if (this._todayRates.oficial > 0) {
             this._previousRates = {
                 oficial: this._todayRates.oficial,
-                paralelo: this._todayRates.paralelo,
+                usdt: this._todayRates.usdt || this._todayRates.paralelo,
+                paralelo: this._todayRates.usdt || this._todayRates.paralelo,
             };
         }
 
-        let newTodayRates = { oficial: 0, paralelo: 0, eur: 0, cop: 0, pen: 0 };
-        let newTomorrowRates = { oficial: 0, paralelo: 0, eur: 0, cop: 0, pen: 0 };
+        let newTodayRates = { oficial: 0, oficialDate: null, usdt: 0, usdtCompra: 0, usdtVenta: 0, eur: 0, cop: 0, pen: 0, paralelo: 0 };
+        let newTomorrowRates = { oficial: 0, oficialDate: null, usdt: 0, usdtCompra: 0, usdtVenta: 0, eur: 0, cop: 0, pen: 0, paralelo: 0 };
         let foundTomorrow = false;
 
         // Get today's effective rate from history
@@ -205,22 +206,41 @@ class RateService {
 
         // Live Rates from Backend
         let liveOficialRate = backendData.oficial || 0;
-        let liveOficialDate = backendData.oficialDate;
-        let liveParaleloRate = backendData.paralelo || 0;
+        let liveOficialDate = backendData.oficialDate || effectiveTodayStr;
         let usdtCompra = backendData.usdtCompra || 0;
         let usdtVenta = backendData.usdtVenta || 0;
+        let usdtAvg = backendData.usdt || ((usdtCompra > 0 && usdtVenta > 0) ? (usdtCompra + usdtVenta) / 2 : (usdtCompra || usdtVenta || backendData.paralelo || 0));
 
         // Client-side fallback if backend failed to get official rate
         if (liveOficialRate === 0) {
             try {
-                const directRes = await fetch('https://rates.dolarvzla.com/bcv/current.json').then(r => r.json());
-                if (directRes?.current?.usd) {
-                    liveOficialRate = directRes.current.usd;
-                    liveOficialDate = directRes.current.date;
+                const ctrl = new AbortController();
+                const to = setTimeout(() => ctrl.abort(), 4000);
+                const directRes = await fetch('https://rates.dolarvzla.com/bcv/current.json', { signal: ctrl.signal }).then(r => r.ok ? r.json() : null);
+                clearTimeout(to);
+                const current = directRes?.current;
+                const previous = directRes?.previous;
+                if (current?.usd) {
+                    if (previous?.usd && current?.date && current.date > calendarTodayStr) {
+                        liveOficialRate = previous.usd;
+                        liveOficialDate = previous.date;
+                        newTomorrowRates.oficial = current.usd;
+                        newTomorrowRates.oficialDate = current.date;
+                        foundTomorrow = true;
+                        if (previous.eur) newTodayRates.eur = previous.eur;
+                        if (current.eur) newTomorrowRates.eur = current.eur;
+                    } else {
+                        liveOficialRate = current.usd;
+                        liveOficialDate = current.date;
+                        if (current.eur) newTodayRates.eur = current.eur;
+                    }
                 }
             } catch (e) {
                 try {
-                    const dApiRes = await fetch('https://ve.dolarapi.com/v1/dolares/oficial').then(r => r.json());
+                    const ctrl = new AbortController();
+                    const to = setTimeout(() => ctrl.abort(), 4000);
+                    const dApiRes = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { signal: ctrl.signal }).then(r => r.ok ? r.json() : null);
+                    clearTimeout(to);
                     if (dApiRes?.promedio) {
                         liveOficialRate = dApiRes.promedio;
                         liveOficialDate = dApiRes.fecha || calendarTodayStr;
@@ -229,45 +249,49 @@ class RateService {
             }
         }
 
-        newTodayRates.paralelo = liveParaleloRate;
-        newTomorrowRates.paralelo = liveParaleloRate;
-        newTodayRates.usdtCompra = usdtCompra;
-        newTodayRates.usdtVenta = usdtVenta;
-        newTomorrowRates.usdtCompra = usdtCompra;
-        newTomorrowRates.usdtVenta = usdtVenta;
-        
-        // On weekends, "today" rate = Friday's rate (the last published BCV rate)
-        newTodayRates.oficial = historicalTodayRate > 0 ? historicalTodayRate : liveOficialRate;
+        newTodayRates.oficial = liveOficialRate > 0 ? liveOficialRate : historicalTodayRate;
+        newTodayRates.oficialDate = liveOficialDate;
+        newTodayRates.usdt = usdtAvg;
+        newTodayRates.usdtCompra = usdtCompra || usdtAvg;
+        newTodayRates.usdtVenta = usdtVenta || usdtAvg;
+        newTodayRates.paralelo = usdtAvg;
+        if (backendData.eur > 0) newTodayRates.eur = backendData.eur;
 
-        if (liveOficialRate > 0) {
+        // Determine tomorrow rate
+        if (backendData.hasTomorrowRate && backendData.oficialNext > 0) {
+            newTomorrowRates.oficial = backendData.oficialNext;
+            newTomorrowRates.oficialDate = backendData.oficialDateNext;
+            newTomorrowRates.eur = backendData.eurNext || newTodayRates.eur;
+            foundTomorrow = true;
+        } else if (!foundTomorrow) {
             if (isWeekend) {
-                // On weekends: the BCV API may show the latest published rate.
-                // "Tomorrow" (Monday) rate: if the live date >= next business day, it's the new rate
                 if (liveOficialDate >= nextBizDayStr) {
                     newTomorrowRates.oficial = liveOficialRate;
+                    newTomorrowRates.oficialDate = liveOficialDate;
                     foundTomorrow = true;
                 } else {
-                    // No new rate published yet for Monday — no "tomorrow" rate available
                     newTomorrowRates.oficial = 0;
                     foundTomorrow = false;
                 }
             } else {
-                // Weekday logic (original)
-                if (liveOficialDate >= calendarTodayStr) {
+                if (liveOficialDate > calendarTodayStr) {
                     newTomorrowRates.oficial = liveOficialRate;
+                    newTomorrowRates.oficialDate = liveOficialDate;
                     foundTomorrow = true;
-                } else if (liveOficialRate !== historicalYesterdayRate && historicalYesterdayRate > 0) {
-                    newTomorrowRates.oficial = liveOficialRate;
-                    foundTomorrow = true;
+                } else {
+                    newTomorrowRates.oficial = 0;
+                    foundTomorrow = false;
                 }
-            }
-            
-            if (newTodayRates.oficial === 0) {
-                newTodayRates.oficial = liveOficialRate;
             }
         }
 
-        // Cross rates — cached for 1 hour to avoid API rate limiting
+        newTomorrowRates.usdt = newTodayRates.usdt;
+        newTomorrowRates.usdtCompra = newTodayRates.usdtCompra;
+        newTomorrowRates.usdtVenta = newTodayRates.usdtVenta;
+        newTomorrowRates.paralelo = newTodayRates.usdt;
+        if (newTomorrowRates.eur === 0) newTomorrowRates.eur = newTodayRates.eur;
+
+        // Cross rates: cached for 1 hour to avoid API rate limiting
         const crossRates = await this._getCrossRates();
         if (crossRates) {
             if (newTodayRates.oficial > 0) {
@@ -310,12 +334,14 @@ class RateService {
         this._lastUpdate = Date.now();
         this._loading = false;
 
-        localStorage.setItem(LIVE_CACHE_KEY, JSON.stringify({
-            todayRates: newTodayRates,
-            tomorrowRates: newTomorrowRates,
-            hasTomorrowRate: foundTomorrow,
-            timestamp: Date.now(),
-        }));
+        try {
+            localStorage.setItem(LIVE_CACHE_KEY, JSON.stringify({
+                todayRates: newTodayRates,
+                tomorrowRates: newTomorrowRates,
+                hasTomorrowRate: foundTomorrow,
+                timestamp: Date.now(),
+            }));
+        } catch { /* quota exceeded or private mode */ }
 
         this._emit('ratesUpdated', {
             todayRates: newTodayRates,
@@ -334,7 +360,10 @@ class RateService {
             return this._crossRateCache;
         }
         try {
-            const eurRes = await fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json());
+            const ctrl = new AbortController();
+            const to = setTimeout(() => ctrl.abort(), 4000);
+            const eurRes = await fetch('https://open.er-api.com/v6/latest/USD', { signal: ctrl.signal }).then(r => r.ok ? r.json() : null);
+            clearTimeout(to);
             if (eurRes?.rates) {
                 this._crossRateCache = eurRes.rates;
                 this._crossRateCacheTime = now;
@@ -352,7 +381,10 @@ class RateService {
         this._loading = true;
         this._emit('loading', true);
         try {
-            const res = await fetch('/.netlify/functions/rates');
+            const ctrl = new AbortController();
+            const to = setTimeout(() => ctrl.abort(), 6000);
+            const res = await fetch('/.netlify/functions/rates', { signal: ctrl.signal });
+            clearTimeout(to);
             if (res.ok) {
                 const data = await res.json();
                 await this._processBackendData(data);
@@ -372,7 +404,11 @@ class RateService {
     // ── Fetch historical rates ──
     async fetchHistoricalRates() {
         try {
-            const res = await fetch('https://ve.dolarapi.com/v1/historicos/dolares');
+            const ctrl = new AbortController();
+            const to = setTimeout(() => ctrl.abort(), 6000);
+            const res = await fetch('https://ve.dolarapi.com/v1/historicos/dolares', { signal: ctrl.signal });
+            clearTimeout(to);
+            if (!res.ok) throw new Error('Historical fetch failed');
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) {
                 this._historicalData = data;
@@ -380,7 +416,9 @@ class RateService {
                 cutoff.setDate(cutoff.getDate() - 90);
                 const cutoffStr = cutoff.toISOString().split('T')[0];
                 const recent = data.filter(d => d.fecha >= cutoffStr);
-                localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(recent));
+                try {
+                    localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(recent));
+                } catch { /* quota exceeded */ }
 
                 this._emit('historicalUpdated', recent);
                 // After getting history, re-fetch live to update today/tomorrow logic

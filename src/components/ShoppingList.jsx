@@ -34,7 +34,7 @@ function ShoppingList() {
 
     const handleAddItem = (e) => {
         if (e) e.preventDefault();
-        const priceNum = parseFloat(itemPrice.replace(/\./g, '').replace(',', '.'));
+        const priceNum = parseFloat(itemPrice.replace(/[\s\u00a0\u202f.]/g, '').replace(',', '.'));
         if (!itemName || isNaN(priceNum) || priceNum <= 0) return;
         
         const parsedQty = parseInt(itemQuantity, 10);
@@ -106,14 +106,16 @@ function ShoppingList() {
 
     return (
         <div className="animate-fade-in-up pb-48">
-            <section className="mb-6 pt-4 flex justify-between items-start">
+            <section className="mb-4 pt-2 flex items-center justify-between">
                 <div>
-                    <h2 className="text-on-surface font-h2 text-h2">Lista de Compras</h2>
-                    <p className="text-on-surface-variant font-body-sm text-body-sm">Controla lo que gastas en el súper</p>
+                    <span className="eyebrow mb-3"><span className="eyebrow-dot" />Compras</span>
+                    <h2 className="text-on-surface text-[28px] font-bold tracking-[-0.03em] leading-[1.1]">Lista de Compras</h2>
+                    <p className="text-on-surface-variant text-sm mt-1">Controla lo que gastas en el súper</p>
                 </div>
                 <button 
+                    type="button"
                     onClick={() => setShowSavedModal(true)}
-                    className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-bold active:scale-95 transition-transform"
+                    className="press h-9 px-3.5 rounded-full well text-xs font-bold text-primary flex items-center gap-1.5"
                 >
                     <span className="material-symbols-outlined text-[16px]">receipt_long</span>
                     Guardadas ({savedLists.length})
@@ -121,128 +123,146 @@ function ShoppingList() {
             </section>
 
             {/* Input form */}
-            <form onSubmit={handleAddItem} className="glass-surface p-4 rounded-2xl mb-6 space-y-4">
-                <div className="flex gap-3">
-                    <div className="flex-[3]">
-                        <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1 block mb-1.5">Producto</label>
-                        <input 
-                            type="text" 
-                            value={itemName}
-                            onChange={(e) => setItemName(e.target.value)}
-                            placeholder="Ej. Harina PAN"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 h-12 text-on-surface focus:border-primary outline-none transition-colors"
-                        />
+            <div className="bezel mb-6">
+                <form onSubmit={handleAddItem} className="bezel-core card-sheen p-4 sm:p-5 space-y-3">
+                    <div className="flex gap-2.5">
+                        <div className="flex-[3]">
+                            <label className="text-[10px] font-bold text-outline uppercase tracking-[0.14em] pl-1 block mb-1">Producto</label>
+                            <div className="well rounded-[16px] px-3.5 h-12 flex items-center focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(66,133,244,0.15)] transition-[border-color,box-shadow] duration-200">
+                                <input 
+                                    type="text" 
+                                    value={itemName}
+                                    onChange={(e) => setItemName(e.target.value)}
+                                    placeholder="Ej. Harina PAN"
+                                    className="w-full bg-transparent border-none focus:ring-0 outline-none text-on-surface font-semibold text-sm placeholder:text-outline-variant/50"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex-[1]">
+                            <label className="text-[10px] font-bold text-outline uppercase tracking-[0.14em] pl-1 block mb-1">Cant.</label>
+                            <div className="well rounded-[16px] px-2 h-12 flex items-center justify-center focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(66,133,244,0.15)] transition-[border-color,box-shadow] duration-200">
+                                <input 
+                                    type="number" 
+                                    min="1"
+                                    value={itemQuantity}
+                                    onChange={(e) => setItemQuantity(e.target.value)}
+                                    className="w-full bg-transparent border-none focus:ring-0 outline-none text-on-surface font-bold text-center text-sm"
+                                />
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex-[1]">
-                        <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1 block mb-1.5">Cant.</label>
-                        <input 
-                            type="number"
-                            min="1"
-                            value={itemQuantity}
-                            onChange={(e) => setItemQuantity(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-2 text-center h-12 text-on-surface focus:border-primary outline-none transition-colors"
-                        />
-                    </div>
-                </div>
 
-                <div className="flex gap-3">
-                    <div className="flex-1">
-                        <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1 block mb-1.5">Precio</label>
-                        <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-2 h-12 focus-within:border-primary transition-colors">
-                            <button 
-                                type="button"
-                                onClick={() => setInputCurrency(inputCurrency === 'USD' ? 'VES' : 'USD')}
-                                className="text-primary font-bold px-2 flex items-center gap-1 active:scale-90"
+                    <div className="flex gap-2.5">
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold text-outline uppercase tracking-[0.14em] pl-1 block mb-1">Precio</label>
+                            <div className="well rounded-[16px] px-2.5 h-12 flex items-center focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(66,133,244,0.15)] transition-[border-color,box-shadow] duration-200">
+                                <button 
+                                    type="button"
+                                    onClick={() => setInputCurrency(inputCurrency === 'USD' ? 'VES' : 'USD')}
+                                    className="press text-primary font-bold text-xs px-2 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center gap-0.5 shrink-0"
+                                    title="Alternar moneda"
+                                >
+                                    {inputCurrency === 'USD' ? '$' : 'Bs'}
+                                    <span className="material-symbols-outlined text-[13px]">swap_vert</span>
+                                </button>
+                                <input 
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={itemPrice}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/[^\d,]/g, '');
+                                        const parts = value.split(',');
+                                        if (parts.length > 2) return;
+                                        if (parts[1] && parts[1].length > 4) return;
+                                        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                        setItemPrice(parts.join(','));
+                                    }}
+                                    placeholder="0,00"
+                                    className="w-full bg-transparent border-none focus:ring-0 outline-none text-on-surface font-bold text-base px-2 placeholder:text-outline-variant/50"
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowScanner(true)}
+                                    className="press w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 hover:bg-primary/25"
+                                    title="Escanear etiqueta"
+                                    aria-label="Escanear precio"
+                                >
+                                    <span className="material-symbols-outlined text-sm">document_scanner</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                type="submit"
+                                aria-label="Agregar producto"
+                                className="press h-12 w-12 rounded-[16px] thumb-primary flex items-center justify-center shrink-0"
                             >
-                                {inputCurrency === 'USD' ? '$' : 'Bs'}
-                                <span className="material-symbols-outlined text-[14px]">swap_vert</span>
-                            </button>
-                            <input 
-                                type="text"
-                                inputMode="decimal"
-                                value={itemPrice}
-                                onChange={(e) => {
-                                    const value = e.target.value.replace(/[^\d,]/g, '');
-                                    const parts = value.split(',');
-                                    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                                    setItemPrice(parts.join(','));
-                                }}
-                                placeholder="0,00"
-                                className="w-full bg-transparent border-none focus:ring-0 outline-none text-on-surface font-bold px-2"
-                            />
-                            <button 
-                                type="button"
-                                onClick={() => setShowScanner(true)}
-                                className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center active:scale-90 transition-colors hover:bg-primary/30"
-                                title="Escanear etiqueta"
-                            >
-                                <span className="material-symbols-outlined text-sm">document_scanner</span>
+                                <span className="material-symbols-outlined text-[20px]">add</span>
                             </button>
                         </div>
                     </div>
-                    <div className="flex items-end">
-                        <button type="submit" className="h-12 px-5 rounded-xl bg-gradient-to-r from-primary to-primary-container text-white font-bold active:scale-95 shadow-lg shadow-primary/20 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[18px]">add</span>
-                        </button>
-                    </div>
-                </div>
-            </form>
+                </form>
+            </div>
 
             {/* List */}
             {items.length > 0 ? (
-                <div className="space-y-3 mb-6">
+                <div className="space-y-2.5 mb-24">
                     <div className="flex items-center justify-between px-1 mb-2">
-                        <span className="text-[11px] font-bold text-outline uppercase tracking-widest">{items.length} Artículos</span>
-                        <div className="flex gap-4">
-                            <button onClick={() => setItems([])} className="text-[11px] text-error font-bold uppercase tracking-widest flex items-center gap-1 active:scale-95">
+                        <span className="text-[10px] font-bold text-outline uppercase tracking-[0.14em]">{items.length} Artículos</span>
+                        <div className="flex gap-3">
+                            <button onClick={() => setItems([])} className="press text-[11px] text-tertiary font-bold uppercase tracking-wider flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[14px]">delete_sweep</span> Vaciar
                             </button>
-                            <button onClick={handleSaveList} className="text-[11px] text-secondary font-bold uppercase tracking-widest flex items-center gap-1 active:scale-95">
-                                <span className="material-symbols-outlined text-[14px]">save</span> Guardar Lista
+                            <button onClick={handleSaveList} className="press text-[11px] text-secondary font-bold uppercase tracking-wider flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">save</span> Guardar lista
                             </button>
                         </div>
                     </div>
                     {itemsWithPrices.map(item => (
-                        <div key={item.id} className="glass-surface p-3.5 rounded-xl flex items-center justify-between animate-slide-down">
-                            <div>
-                                <p className="text-on-surface font-semibold leading-tight flex items-center gap-2">
-                                    {item.name}
+                        <div key={item.id} className="card-glass p-3.5 flex items-center justify-between animate-slide-down">
+                            <div className="min-w-0 pr-3">
+                                <p className="text-on-surface font-bold text-sm leading-tight flex items-center gap-2 truncate">
+                                    <span className="truncate">{item.name}</span>
                                     {(item.quantity > 1) && (
-                                        <span className="bg-primary/20 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-md">x{item.quantity}</span>
+                                        <span className="thumb-neutral text-[10px] font-bold px-1.5 h-5 rounded-md flex items-center shrink-0">x{item.quantity}</span>
                                     )}
                                 </p>
-                                <p className="text-outline text-[10px] uppercase font-bold mt-0.5">
+                                <p className="text-outline text-[11px] font-semibold mt-0.5">
                                     Bs. {(item.priceVES || 0).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <span className="text-primary font-bold text-lg whitespace-nowrap">
+                            <div className="flex items-center gap-3 shrink-0">
+                                <span className="text-primary font-bold text-lg tracking-tight">
                                     ${(item.priceUSD || 0).toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                 </span>
-                                <button onClick={() => deleteItem(item.id)} className="w-8 h-8 rounded-full bg-error/10 text-error flex items-center justify-center active:scale-90 flex-shrink-0">
-                                    <span className="material-symbols-outlined text-sm">close</span>
+                                <button
+                                    onClick={() => deleteItem(item.id)}
+                                    aria-label="Eliminar artículo"
+                                    className="press w-7 h-7 rounded-full well flex items-center justify-center text-outline hover:text-tertiary"
+                                >
+                                    <span className="material-symbols-outlined text-[14px]">close</span>
                                 </button>
                             </div>
                         </div>
                     ))}
                 </div>
             ) : (
-                <div className="glass-surface p-8 rounded-2xl flex flex-col items-center justify-center text-center text-outline">
+                <div className="card-glass p-8 flex flex-col items-center justify-center text-center text-outline">
                     <span className="material-symbols-outlined text-4xl mb-2 opacity-50">shopping_cart</span>
-                    <p className="text-sm">Tu lista de compras está vacía</p>
+                    <p className="text-sm font-medium">Tu lista de compras está vacía</p>
                 </div>
             )}
 
             {/* Floating Total Bar */}
-            <div className="fixed bottom-[88px] left-0 right-0 px-4 z-40 pointer-events-none">
-                <div className="max-w-3xl mx-auto">
-                    <div className="bg-surface/90 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] flex items-center justify-between pointer-events-auto">
+            <div className="fixed bottom-[84px] left-3 right-3 z-40 pointer-events-none">
+                <div className="max-w-md mx-auto">
+                    <div className="glass-aero card-sheen rounded-[24px] p-4 flex items-center justify-between pointer-events-auto">
                         <div>
-                            <p className="text-[10px] text-outline uppercase font-bold tracking-widest mb-0.5">Total Estimado</p>
+                            <p className="text-[10px] text-outline uppercase font-bold tracking-[0.14em] mb-0.5">Total Estimado</p>
                             <p className="text-on-surface font-bold text-sm">Bs. {totalVES.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-primary font-numeral-display text-3xl font-extrabold leading-none" style={{ filter: 'drop-shadow(0 0 10px rgba(66,133,244,0.3))' }}>
+                            <p className="text-primary text-[28px] font-bold tracking-tight leading-none">
                                 ${totalUSD.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </p>
                         </div>
@@ -267,14 +287,23 @@ function ShoppingList() {
 
             {/* Modal de Listas Guardadas */}
             {showSavedModal && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
-                    <div className="bg-surface w-full h-[85vh] rounded-t-3xl border-t border-white/10 flex flex-col animate-slide-up">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="saved-lists-title"
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col justify-end animate-overlay"
+                    onClick={() => setShowSavedModal(false)}
+                >
+                    <div
+                        className="bg-surface w-full h-[85vh] rounded-t-3xl border-t border-white/10 flex flex-col animate-slide-up"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex justify-between items-center p-6 border-b border-white/5">
-                            <h3 className="text-on-surface font-h3 text-h3 flex items-center gap-2">
+                            <h3 id="saved-lists-title" className="text-on-surface font-h3 text-h3 flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary">receipt_long</span>
                                 Compras Guardadas
                             </h3>
-                            <button onClick={() => setShowSavedModal(false)} className="w-8 h-8 rounded-full bg-white/5 text-outline flex items-center justify-center active:scale-90">
+                            <button onClick={() => setShowSavedModal(false)} className="w-9 h-9 rounded-full bg-white/5 text-outline flex items-center justify-center active:scale-95 transition-transform" aria-label="Cerrar">
                                 <span className="material-symbols-outlined text-sm">close</span>
                             </button>
                         </div>

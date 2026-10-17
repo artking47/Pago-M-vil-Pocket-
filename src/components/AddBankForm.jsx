@@ -27,7 +27,22 @@ function AddBankForm({ onAdd, onClose, initialData = null }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (validateForm()) { 
-            onAdd(formData, initialData?.id); 
+            const rawCedula = formData.cedula.trim().toUpperCase().replace(/\s/g, '');
+            const formattedCedula = rawCedula.includes('-') 
+                ? rawCedula 
+                : `${rawCedula[0]}-${rawCedula.slice(1)}`;
+
+            let cleanPhone = formData.telefono.replace(/[-\s]/g, '');
+            if (!cleanPhone.startsWith('0')) cleanPhone = '0' + cleanPhone;
+            const formattedPhone = `${cleanPhone.slice(0, 4)}-${cleanPhone.slice(4)}`;
+
+            const cleanBank = {
+                banco: formData.banco.trim(),
+                cedula: formattedCedula,
+                telefono: formattedPhone,
+            };
+
+            onAdd(cleanBank, initialData?.id); 
             if (!initialData) setFormData({ banco: BANK_LIST[0], cedula: '', telefono: '' }); 
             setErrors({}); 
             onClose(); 
@@ -46,9 +61,17 @@ function AddBankForm({ onAdd, onClose, initialData = null }) {
     const selectedBankInitials = getBankInitials(formData.banco);
 
     return (
-        <div className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-fade-in-up"
-            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}>
-            <div className="card-glass max-w-md w-full p-0 overflow-hidden animate-slide-down">
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-bank-modal-title"
+            className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-overlay bg-black/60 backdrop-blur-md"
+            onClick={onClose}
+        >
+            <div
+                className="card-glass max-w-md w-full p-0 overflow-hidden animate-modal-enter shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="p-5 text-white" style={{ background: selectedBankColor }}>
                     <div className="flex items-center justify-between">
@@ -57,12 +80,12 @@ function AddBankForm({ onAdd, onClose, initialData = null }) {
                                 <PlusIcon className="w-6 h-6" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold">{initialData ? 'Editar Cuenta' : 'Nueva Cuenta'}</h2>
+                                <h2 id="add-bank-modal-title" className="text-xl font-bold">{initialData ? 'Editar Cuenta' : 'Nueva Cuenta'}</h2>
                                 <p className="text-white/70 text-sm">{initialData ? 'Actualiza los datos' : 'Agrega tus datos de Pago Móvil'}</p>
                             </div>
                         </div>
                         <button onClick={onClose}
-                            className="w-9 h-9 rounded-lg hover:bg-white/15 transition-colors flex items-center justify-center"
+                            className="w-10 h-10 rounded-xl hover:bg-white/15 active:scale-95 transition-transform flex items-center justify-center"
                             aria-label="Cerrar">
                             <XIcon className="w-5 h-5" />
                         </button>

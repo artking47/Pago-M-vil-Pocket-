@@ -40,74 +40,84 @@ function PaypalCalculator() {
     const formatCurrency = (val) => val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return (
-        <article className="glass-surface rounded-2xl p-md flex flex-col gap-md animate-fade-in-up">
-            <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-blue-400">payments</span>
-                </div>
-                <div>
-                    <h3 className="text-on-surface font-h3 text-h3 leading-none">PayPal</h3>
-                    <p className="text-[12px] text-outline">Calculadora de Comisiones</p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 bg-white/5 p-1 rounded-xl">
-                <button 
-                    onClick={() => setMode('enviar')} 
-                    className={`py-2 text-[13px] font-semibold rounded-lg transition-all ${mode === 'enviar' ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg' : 'text-outline hover:text-on-surface'}`}
-                >
-                    Si envío...
-                </button>
-                <button 
-                    onClick={() => setMode('recibir')} 
-                    className={`py-2 text-[13px] font-semibold rounded-lg transition-all ${mode === 'recibir' ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg' : 'text-outline hover:text-on-surface'}`}
-                >
-                    Para recibir...
-                </button>
-            </div>
-
-            <div className="space-y-1.5 mt-2">
-                <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1">
-                    {mode === 'enviar' ? 'Monto a Enviar' : 'Monto Neto a Recibir'}
-                </label>
-                <div className="glass-surface-active rounded-xl flex items-center px-4 h-14 border-blue-500/30">
-                    <span className="text-blue-400 font-bold mr-3">$</span>
-                    <input
-                        className="bg-transparent border-none focus:ring-0 outline-none text-on-surface font-h2 text-h2 p-0 w-full placeholder:text-outline-variant/40"
-                        placeholder="0,00"
-                        type="text"
-                        value={amount}
-                        onChange={handleAmountChange}
-                        inputMode="decimal"
-                    />
-                </div>
-            </div>
-
-            {numAmount > 0 && (
-                <div className="glass-surface border border-blue-500/20 rounded-xl p-4 mt-2 space-y-3 animate-slide-down">
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-outline">Monto de envío (Bruto):</span>
-                        <span className="text-on-surface font-bold">${formatCurrency(envioBruto)}</span>
+        <div className="bezel animate-fade-in-up">
+            <article className="bezel-core card-sheen p-4 sm:p-5 flex flex-col gap-md">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-[13px] thumb-primary flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[20px]">payments</span>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-outline">Comisión PayPal (5.4% + $0.30):</span>
-                        <span className="text-error font-medium">-${formatCurrency(comision)}</span>
+                    <div>
+                        <h3 className="text-on-surface text-[17px] font-bold tracking-[-0.02em] leading-none">PayPal</h3>
+                        <p className="text-[11px] text-outline mt-1">Calculadora de comisiones internacionales</p>
                     </div>
-                    <div className="w-full h-px bg-white/10 my-1"></div>
-                    <div className="flex justify-between items-center text-lg font-bold">
-                        <span className="text-blue-400">Total recibido (Neto):</span>
-                        <span className="text-blue-400">${formatCurrency(reciboNeto)}</span>
-                    </div>
-                    
-                    {mode === 'recibir' && (
-                        <div className="mt-4 bg-blue-500/10 p-3 rounded-lg text-center">
-                            <span className="text-[11px] text-blue-300 font-bold block mb-1">Debes pedirle a la otra persona:</span>
-                            <span className="font-numeral-display text-2xl text-on-surface">${formatCurrency(envioBruto)}</span>
+                </div>
+
+                <div className="well grid grid-cols-2 gap-1 p-1 rounded-[16px]" role="tablist" aria-label="Modo de cálculo">
+                    <button 
+                        type="button"
+                        role="tab"
+                        aria-selected={mode === 'enviar'}
+                        onClick={() => setMode('enviar')} 
+                        className={`press h-10 text-[12px] font-bold rounded-[12px] transition-[background-color,color,box-shadow] duration-200 ${mode === 'enviar' ? 'thumb-primary' : 'text-outline hover:text-on-surface'}`}
+                    >
+                        Si envío...
+                    </button>
+                    <button 
+                        type="button"
+                        role="tab"
+                        aria-selected={mode === 'recibir'}
+                        onClick={() => setMode('recibir')} 
+                        className={`press h-10 text-[12px] font-bold rounded-[12px] transition-[background-color,color,box-shadow] duration-200 ${mode === 'recibir' ? 'thumb-primary' : 'text-outline hover:text-on-surface'}`}
+                    >
+                        Para recibir...
+                    </button>
+                </div>
+
+                <div className="space-y-1.5">
+                    <div className="well rounded-[20px] px-4 pt-3 pb-3.5 focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(66,133,244,0.15)] transition-[border-color,box-shadow] duration-200">
+                        <label className="block text-[10px] font-bold text-outline uppercase tracking-[0.14em]">
+                            {mode === 'enviar' ? 'Monto a enviar' : 'Monto neto a recibir'}
+                        </label>
+                        <div className="flex items-baseline gap-2 mt-1">
+                            <span className="text-primary font-bold text-xl">$</span>
+                            <input
+                                className="bg-transparent border-none focus:ring-0 outline-none text-on-surface text-[32px] font-bold tracking-[-0.03em] leading-tight p-0 w-full placeholder:text-outline-variant/50"
+                                placeholder="0,00"
+                                type="text"
+                                value={amount}
+                                onChange={handleAmountChange}
+                                inputMode="decimal"
+                            />
                         </div>
-                    )}
+                    </div>
                 </div>
-            )}
-        </article>
+
+                {numAmount > 0 && (
+                    <div className="card-glass p-4 space-y-3 animate-slide-down">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-outline text-xs">Monto de envío (Bruto):</span>
+                            <span className="text-on-surface font-bold text-base">${formatCurrency(envioBruto)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-outline text-xs">Comisión PayPal (5.4% + $0.30):</span>
+                            <span className="text-tertiary font-bold text-sm">-${formatCurrency(comision)}</span>
+                        </div>
+                        <div className="w-full h-px bg-white/10 my-1"></div>
+                        <div className="flex justify-between items-center text-base font-bold">
+                            <span className="text-primary text-sm uppercase tracking-wider">Total recibido (Neto):</span>
+                            <span className="text-primary text-xl">${formatCurrency(reciboNeto)}</span>
+                        </div>
+                        
+                        {mode === 'recibir' && (
+                            <div className="mt-3 p-3.5 rounded-[16px] bg-primary/10 border border-primary/20 text-center">
+                                <span className="text-[10px] text-outline font-bold uppercase tracking-[0.14em] block mb-1">Debes solicitar a la otra persona</span>
+                                <span className="text-2xl font-bold tracking-tight text-primary">${formatCurrency(envioBruto)}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </article>
+        </div>
     );
 }
 

@@ -5,8 +5,8 @@ import useRates from '../hooks/useRates';
 
 const CURRENCIES = [
     { code: 'USD', name: 'Dólar BCV', symbol: '$', source: 'oficial' },
-    { code: 'EUR', name: 'Euro', symbol: '€', source: 'eur' },
-    { code: 'USDT', name: 'USDT', symbol: '₮', source: 'paralelo' },
+    { code: 'USDT', name: 'Binance USDT', symbol: '₮', source: 'usdt' },
+    { code: 'EUR', name: 'Euro BCV', symbol: '€', source: 'eur' },
     { code: 'COP', name: 'Peso COP', symbol: 'COL$', source: 'cop' },
     { code: 'PEN', name: 'Sol Peruano', symbol: 'S/', source: 'pen' },
 ];
@@ -25,6 +25,7 @@ function CurrencyCalculator() {
     const [amount, setAmount] = useState('');
     const [result, setResult] = useState('');
     const [copied, setCopied] = useState(false);
+    const [resultCopied, setResultCopied] = useState(false);
     const [rateCopied, setRateCopied] = useState(false);
     const [isSwapped, setIsSwapped] = useState(false);
     const [isSwappingAnim, setIsSwappingAnim] = useState(false);
@@ -43,25 +44,26 @@ function CurrencyCalculator() {
     // Rate change animation
     const [rateFlash, setRateFlash] = useState(null); // 'up' | 'down' | null
     const prevOficialRef = useRef(todayRates.oficial);
-    const prevParaleloRef = useRef(todayRates.paralelo);
+    const prevUsdtRef = useRef(todayRates.usdt || todayRates.paralelo);
 
     // Detect rate changes and trigger flash animation
     useEffect(() => {
         const prevOficial = prevOficialRef.current;
-        const prevParalelo = prevParaleloRef.current;
+        const prevUsdt = prevUsdtRef.current;
+        const currentUsdt = todayRates.usdt || todayRates.paralelo;
         
         if (prevOficial > 0 && todayRates.oficial !== prevOficial) {
             setRateFlash(todayRates.oficial > prevOficial ? 'up' : 'down');
             setTimeout(() => setRateFlash(null), 1500);
         }
-        if (prevParalelo > 0 && todayRates.paralelo !== prevParalelo) {
-            setRateFlash(todayRates.paralelo > prevParalelo ? 'up' : 'down');
+        if (prevUsdt > 0 && currentUsdt !== prevUsdt) {
+            setRateFlash(currentUsdt > prevUsdt ? 'up' : 'down');
             setTimeout(() => setRateFlash(null), 1500);
         }
         
         prevOficialRef.current = todayRates.oficial;
-        prevParaleloRef.current = todayRates.paralelo;
-    }, [todayRates.oficial, todayRates.paralelo]);
+        prevUsdtRef.current = currentUsdt;
+    }, [todayRates.oficial, todayRates.usdt, todayRates.paralelo]);
 
     useEffect(() => {
         const handleOnline = () => setIsOnline(true);
@@ -87,7 +89,10 @@ function CurrencyCalculator() {
             if (code === 'USD') return activeRates.oficial;
             if (code === 'EUR') return activeRates.eur;
             if (code === 'USDT') {
-                return usdtTradeMode === 'compra' ? activeRates.usdtCompra : activeRates.usdtVenta;
+                const usdtVal = usdtTradeMode === 'compra' 
+                    ? (activeRates.usdtCompra || activeRates.usdt || activeRates.paralelo) 
+                    : (activeRates.usdtVenta || activeRates.usdt || activeRates.paralelo);
+                return usdtVal || activeRates.oficial;
             }
             if (code === 'COP') {
                 if (mode === 'manual' && selectedCurrency === 'COP') {
@@ -119,11 +124,25 @@ function CurrencyCalculator() {
         const valSelected = getValueInVes(selectedCurrency);
         const valTarget = getValueInVes(targetCurrency);
         return valTarget > 0 ? valSelected / valTarget : 0;
-    }, [selectedCurrency, targetCurrency, todayRates, tomorrowRates, rateView, mode, manualRate, usdtTradeMode]);
+    }, [selectedCurrency, targetCurrency, todayRates, tomorrowRates, hasTomorrowRate, rateView, mode, manualRate, usdtTradeMode]);
+
+    const handleQuickAmount = (val) => {
+        setAmount(val);
+    };
+
+    const handleCopyResult = async () => {
+        if (!result) return;
+        try {
+            await navigator.clipboard.writeText(result);
+            if (navigator.vibrate) navigator.vibrate(20);
+            setResultCopied(true);
+            setTimeout(() => setResultCopied(false), 2000);
+        } catch {}
+    };
 
     // Calculate result
     useEffect(() => {
-        const numAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
+        const numAmount = parseFloat(amount.replace(/[\s\u00a0\u202f.]/g, '').replace(',', '.'));
         if (isNaN(numAmount) || numAmount === 0) { setResult(''); return; }
         const rate = getRateForDisplay();
         if (rate === 0) { setResult(''); return; }
@@ -140,6 +159,8 @@ function CurrencyCalculator() {
     const handleAmountChange = (e) => {
         const value = e.target.value.replace(/[^\d,]/g, '');
         const parts = value.split(',');
+        if (parts.length > 2) return;
+        if (parts[1] && parts[1].length > 4) return;
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
         setAmount(parts.join(','));
     };
@@ -147,13 +168,19 @@ function CurrencyCalculator() {
     const handleCashChange = (e) => {
         const value = e.target.value.replace(/[^\d,]/g, '');
         const parts = value.split(',');
+        if (parts.length > 2) return;
+        if (parts[1] && parts[1].length > 4) return;
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
         setCashGiven(parts.join(','));
     };
 
     const handleManualRateChange = (e) => {
         const value = e.target.value.replace(/[^\d,]/g, '');
-        setManualRate(value);
+        const parts = value.split(',');
+        if (parts.length > 2) return;
+        if (parts[1] && parts[1].length > 6) return;
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        setManualRate(parts.join(','));
     };
 
     const handleSwap = () => {
@@ -223,50 +250,145 @@ function CurrencyCalculator() {
     // Rate change delta
     const oficialDelta = previousRates.oficial > 0 && todayRates.oficial !== previousRates.oficial
         ? todayRates.oficial - previousRates.oficial : 0;
-    const paraleloDelta = previousRates.paralelo > 0 && todayRates.paralelo !== previousRates.paralelo
-        ? todayRates.paralelo - previousRates.paralelo : 0;
+    const usdtDelta = previousRates.usdt > 0 && todayRates.usdt !== previousRates.usdt
+        ? todayRates.usdt - previousRates.usdt : 0;
 
     // Flash CSS class
     const flashClass = rateFlash === 'up' ? 'rate-flash-up' : rateFlash === 'down' ? 'rate-flash-down' : '';
 
     return (
-        <article className="glass-surface rounded-2xl p-md flex flex-col gap-md">
+        <div className="bezel">
+        <article className="bezel-core card-sheen p-4 sm:p-5 flex flex-col gap-md">
             {/* Card Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary-container/20 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>calculate</span>
+                    <div className="w-10 h-10 rounded-[13px] thumb-primary flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>calculate</span>
                     </div>
                     <div>
-                        <h3 className="text-on-surface font-h3 text-h3 leading-none">Calculadora</h3>
-                        <p className="text-[12px] text-outline">Conversor de divisas • Tiempo real</p>
+                        <h3 className="text-on-surface text-[17px] font-bold tracking-[-0.02em] leading-none">Calculadora</h3>
+                        <p className="text-[11px] text-outline mt-1">Conversor de divisas en tiempo real</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 bg-primary/10 px-2 py-1 rounded-full">
-                        <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-primary animate-pulse' : 'bg-tertiary-container'}`}></div>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isOnline ? 'text-primary' : 'text-tertiary-container'}`}>{isOnline ? 'Live' : 'Offline'}</span>
+                <div className="flex items-center gap-2">
+                    <div className={`flex items-center gap-1.5 px-2.5 h-7 rounded-full border ${isOnline ? 'bg-primary/10 border-primary/20' : 'bg-tertiary-container/10 border-tertiary-container/20'}`}>
+                        <span className="relative flex w-1.5 h-1.5">
+                            {isOnline && <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 animate-ping" />}
+                            <span className={`relative inline-flex w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-primary' : 'bg-tertiary-container'}`} />
+                        </span>
+                        <span className={`text-[10px] font-bold uppercase tracking-[0.12em] ${isOnline ? 'text-primary' : 'text-tertiary-container'}`}>{isOnline ? 'Live' : 'Offline'}</span>
                     </div>
-                    <button onClick={refresh} className="text-outline hover:text-on-surface transition-colors active:scale-90" disabled={loading}>
-                        <span className={`material-symbols-outlined text-md ${loading ? 'animate-spin' : ''}`}>refresh</span>
+                    <button
+                        onClick={refresh}
+                        className="press w-9 h-9 rounded-full well flex items-center justify-center text-outline hover:text-on-surface transition-colors"
+                        disabled={loading}
+                        aria-label="Actualizar tasas"
+                        title="Actualizar tasas"
+                    >
+                        <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
                     </button>
                 </div>
             </div>
 
-            {/* Mode Toggle */}
-            <div className="grid grid-cols-2 bg-white/5 p-1 rounded-xl">
-                <button onClick={() => setMode('api')} className={`py-2 text-[13px] font-semibold rounded-lg transition-all ${mode === 'api' ? 'bg-gradient-to-r from-primary to-primary/80 text-on-primary-fixed shadow-lg' : 'text-outline hover:text-on-surface'}`}>Tasa en vivo</button>
-                <button onClick={() => setMode('manual')} className={`py-2 text-[13px] font-semibold rounded-lg transition-all ${mode === 'manual' ? 'bg-gradient-to-r from-primary to-primary/80 text-on-primary-fixed shadow-lg' : 'text-outline hover:text-on-surface'}`}>Tasa manual</button>
+            {/* Segmented Rate Pill Selector (1-Tap Switch) */}
+            <div className="well grid grid-cols-3 gap-1 p-1 rounded-[18px]" role="tablist" aria-label="Fuente de tasa">
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === 'api' && selectedCurrency === 'USD'}
+                    onClick={() => {
+                        setMode('api');
+                        setSelectedCurrency('USD');
+                    }}
+                    className={`press flex flex-col items-center justify-center h-[52px] px-1 rounded-[14px] transition-[background-color,color,box-shadow] duration-200 ${
+                        mode === 'api' && selectedCurrency === 'USD'
+                            ? 'thumb-primary'
+                            : 'text-outline hover:text-on-surface'
+                    }`}
+                >
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] opacity-80">BCV Oficial</span>
+                    <span className="text-[14px] font-bold tracking-tight mt-0.5">
+                        {todayRates.oficial > 0 ? todayRates.oficial.toFixed(2) : '-'}
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === 'api' && selectedCurrency === 'USDT'}
+                    onClick={() => {
+                        setMode('api');
+                        setSelectedCurrency('USDT');
+                    }}
+                    className={`press flex flex-col items-center justify-center h-[52px] px-1 rounded-[14px] transition-[background-color,color,box-shadow] duration-200 ${
+                        mode === 'api' && selectedCurrency === 'USDT'
+                            ? 'thumb-primary'
+                            : 'text-outline hover:text-on-surface'
+                    }`}
+                >
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] opacity-80">Binance USDT</span>
+                    <span className="text-[14px] font-bold tracking-tight mt-0.5">
+                        {(todayRates.usdt || todayRates.paralelo || 0) > 0 ? (todayRates.usdt || todayRates.paralelo).toFixed(2) : '-'}
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === 'manual'}
+                    onClick={() => setMode('manual')}
+                    className={`press flex flex-col items-center justify-center h-[52px] px-1 rounded-[14px] transition-[background-color,color,box-shadow] duration-200 ${
+                        mode === 'manual'
+                            ? 'thumb-primary'
+                            : 'text-outline hover:text-on-surface'
+                    }`}
+                >
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] opacity-80">Manual</span>
+                    <span className="text-[14px] font-bold tracking-tight mt-0.5 truncate max-w-full">
+                        {manualRate ? manualRate : 'Tu tasa'}
+                    </span>
+                </button>
             </div>
 
-            {/* Currency Pills */}
+            {/* Smart Tasa de Mañana Banner (cuando esté publicada) */}
+            {hasTomorrowRate && tomorrowRates.oficial > 0 && (
+                <div className="relative overflow-hidden rounded-[16px] p-3 pl-3.5 flex items-center justify-between animate-fade-in-up border border-secondary/25 bg-gradient-to-r from-secondary/[0.12] to-primary/[0.06]">
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <span className="material-symbols-outlined text-secondary text-xl shrink-0">event_upcoming</span>
+                        <div className="min-w-0">
+                            <p className="text-xs font-bold text-on-surface truncate">
+                                Tasa de mañana publicada: <span className="text-primary font-mono font-extrabold">Bs. {tomorrowRates.oficial.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </p>
+                            <p className="text-[10px] text-outline truncate">
+                                Fecha valor: {tomorrowRates.oficialDate || getTomorrowDate()}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setRateView(rateView === 'manana' ? 'hoy' : 'manana')}
+                        className={`press px-3.5 h-8 rounded-full text-xs font-bold shrink-0 transition-[background-color,color,box-shadow] duration-200 ${
+                            rateView === 'manana'
+                                ? 'thumb-primary'
+                                : 'thumb-neutral'
+                        }`}
+                    >
+                        {rateView === 'manana' ? 'Aplicada ✓' : 'Aplicar'}
+                    </button>
+                </div>
+            )}
+
+            {/* Currency Pills for Other Currencies */}
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                 {CURRENCIES.map(cur => (
-                    <button key={cur.code} onClick={() => setSelectedCurrency(cur.code)}
-                        className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-full transition-all duration-200 ${selectedCurrency === cur.code ? 'border border-primary bg-primary/10 shadow-[0_0_12px_rgba(66,133,244,0.2)]' : 'glass-surface hover:bg-white/[0.06]'}`}>
+                    <button key={cur.code} onClick={() => {
+                        setSelectedCurrency(cur.code);
+                        if (mode === 'manual' && cur.code !== 'USD' && cur.code !== 'USDT') setMode('api');
+                    }}
+                        className={`press flex-shrink-0 flex items-center gap-2 pl-1.5 pr-3.5 h-9 rounded-full border transition-[background-color,border-color,box-shadow] duration-200 ${selectedCurrency === cur.code ? 'border-primary/50 bg-primary/[0.12] shadow-[0_0_0_3px_rgba(66,133,244,0.10)]' : 'border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.06]'}`}>
                         <CurrencyFlag code={cur.code} size={22} />
-                        <span className={`text-[12px] font-bold ${selectedCurrency === cur.code ? 'text-on-surface' : 'text-outline'}`}>{cur.name}</span>
+                        <span className={`text-[12px] font-bold tracking-tight ${selectedCurrency === cur.code ? 'text-on-surface' : 'text-outline'}`}>{cur.name}</span>
                     </button>
                 ))}
             </div>
@@ -274,17 +396,17 @@ function CurrencyCalculator() {
             {/* Target Currency Selector */}
             {selectedCurrency !== 'USD' && (
                 <div className="space-y-1.5 animate-slide-down transition-all duration-300">
-                    <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1">Convertir a</label>
-                    <div className="grid grid-cols-2 bg-white/5 p-1 rounded-xl">
+                    <label className="text-[10px] font-bold text-outline uppercase tracking-[0.14em] pl-1">Convertir a</label>
+                    <div className="well grid grid-cols-2 gap-1 p-1 rounded-[16px]">
                         <button
                             onClick={() => setTargetCurrency('VES')}
-                            className={`py-2 text-[12px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${targetCurrency === 'VES' ? 'bg-gradient-to-r from-primary to-primary/80 text-on-primary-fixed shadow-lg' : 'text-outline hover:text-on-surface'}`}
+                            className={`press h-10 text-[12px] font-bold rounded-[12px] transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5 ${targetCurrency === 'VES' ? 'thumb-neutral' : 'text-outline hover:text-on-surface'}`}
                         >
                             <CurrencyFlag code="VES" size={18} /> Bolívares
                         </button>
                         <button
                             onClick={() => setTargetCurrency('USD')}
-                            className={`py-2 text-[12px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${targetCurrency === 'USD' ? 'bg-gradient-to-r from-primary to-primary/80 text-on-primary-fixed shadow-lg' : 'text-outline hover:text-on-surface'}`}
+                            className={`press h-10 text-[12px] font-bold rounded-[12px] transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5 ${targetCurrency === 'USD' ? 'thumb-neutral' : 'text-outline hover:text-on-surface'}`}
                         >
                             <CurrencyFlag code="USD" size={18} /> Dólares
                         </button>
@@ -294,20 +416,20 @@ function CurrencyCalculator() {
 
             {/* USDT Compra/Venta Selector */}
             {selectedCurrency === 'USDT' && (
-                <div className="space-y-1.5 animate-slide-down transition-all duration-300 mt-2">
-                    <label className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1">Operación (Binance P2P)</label>
-                    <div className="grid grid-cols-2 bg-white/5 p-1 rounded-xl">
+                <div className="space-y-1.5 animate-slide-down transition-all duration-300 mt-1">
+                    <label className="text-[10px] font-bold text-outline uppercase tracking-[0.14em] pl-1">Operación (Binance P2P)</label>
+                    <div className="well grid grid-cols-2 gap-1 p-1 rounded-[16px]">
                         <button
                             onClick={() => setUsdtTradeMode('compra')}
-                            className={`py-2 text-[12px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${usdtTradeMode === 'compra' ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg' : 'text-outline hover:text-on-surface'}`}
+                            className={`press h-10 text-[12px] font-bold rounded-[12px] transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5 ${usdtTradeMode === 'compra' ? 'thumb-neutral !text-green-400' : 'text-outline hover:text-on-surface'}`}
                         >
-                            Comprar USDT
+                            Comprar · {todayRates.usdtCompra > 0 ? todayRates.usdtCompra.toFixed(2) : '-'}
                         </button>
                         <button
                             onClick={() => setUsdtTradeMode('venta')}
-                            className={`py-2 text-[12px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${usdtTradeMode === 'venta' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg' : 'text-outline hover:text-on-surface'}`}
+                            className={`press h-10 text-[12px] font-bold rounded-[12px] transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5 ${usdtTradeMode === 'venta' ? 'thumb-neutral !text-tertiary' : 'text-outline hover:text-on-surface'}`}
                         >
-                            Vender USDT
+                            Vender · {todayRates.usdtVenta > 0 ? todayRates.usdtVenta.toFixed(2) : '-'}
                         </button>
                     </div>
                 </div>
@@ -316,10 +438,10 @@ function CurrencyCalculator() {
             {/* Manual Rate Input */}
             {mode === 'manual' && (
                 <div className="space-y-1.5 animate-slide-down">
-                    <label htmlFor="manualRateInput" className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1">
+                    <label htmlFor="manualRateInput" className="text-[10px] font-bold text-outline uppercase tracking-[0.14em] pl-1">
                         Tasa manual ({displayTargetSymbol} por 1 {selectedCurrency})
                     </label>
-                    <div className="glass-surface-active rounded-xl flex items-center px-4 h-12">
+                    <div className="well rounded-[16px] flex items-center px-4 h-12 focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(66,133,244,0.15)] transition-[border-color,box-shadow] duration-200">
                         <span className="text-secondary font-bold mr-3">{displayTargetSymbol}</span>
                         <input
                             id="manualRateInput"
@@ -333,26 +455,26 @@ function CurrencyCalculator() {
 
             {/* Rate Display with Hoy/Mañana toggle */}
             {mode === 'api' && (
-                <div className={`flex justify-between items-center bg-white/5 border border-white/5 rounded-2xl p-4 transition-all duration-500 ${flashClass}`}>
+                <div className={`flex justify-between items-center well rounded-[18px] p-4 transition-colors duration-500 ${flashClass}`}>
                     <div className="space-y-1 flex-1 min-w-0">
                         <div className="flex gap-1">
                             <button
                                 onClick={() => setRateView('hoy')}
-                                className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase transition-all active:scale-95 ${rateView === 'hoy' ? 'bg-secondary text-on-secondary' : 'bg-white/5 text-outline hover:text-on-surface'}`}>
-                                Hoy ({getTodayDate()})
+                                className={`press px-2.5 h-6 rounded-full text-[10px] font-bold uppercase tracking-[0.06em] transition-[background-color,color] duration-200 ${rateView === 'hoy' ? 'bg-secondary text-on-secondary' : 'bg-white/5 text-outline hover:text-on-surface'}`}>
+                                Hoy · {todayRates.oficialDate || getTodayDate()}
                             </button>
                             <button
                                 onClick={() => setRateView('manana')}
-                                className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase transition-all active:scale-95 ${rateView === 'manana' ? 'bg-primary text-on-primary-fixed' : 'bg-white/5 text-outline hover:text-on-surface'}`}>
-                                Mañana ({getTomorrowDate()})
+                                className={`press px-2.5 h-6 rounded-full text-[10px] font-bold uppercase tracking-[0.06em] transition-[background-color,color] duration-200 ${rateView === 'manana' ? 'bg-primary text-white' : 'bg-white/5 text-outline hover:text-on-surface'}`}>
+                                Mañana · {tomorrowRates.oficialDate || getTomorrowDate()}
                             </button>
                         </div>
                         <div className="pt-1">
                             {loading && displayRate === 0 ? (
                                 <div className="h-8 w-48 bg-white/10 animate-pulse rounded-md mt-1"></div>
                             ) : (
-                                <p className={`text-primary font-numeral-display text-h2 truncate transition-all duration-300 ${flashClass}`}>
-                                    1 {selectedCurrency} = {displayRate > 0 ? displayRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—'} {displayTargetSymbol}
+                                <p className={`text-on-surface text-[22px] font-bold tracking-[-0.03em] truncate transition-opacity duration-300 ${flashClass}`}>
+                                    <span className="text-outline font-semibold text-[15px]">1 {selectedCurrency} = </span>{displayRate > 0 ? displayRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '-'} <span className="text-primary">{displayTargetSymbol}</span>
                                 </p>
                             )}
                         </div>
@@ -363,8 +485,9 @@ function CurrencyCalculator() {
                     <div className="flex items-center gap-3 flex-shrink-0">
                         <button
                             onClick={handleCopyRate}
-                            className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-outline hover:text-on-surface transition-all active:scale-90 hover:bg-white/10"
+                            className="press w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-outline hover:text-on-surface transition-colors duration-150 hover:bg-white/10"
                             title="Copiar tasa de cambio"
+                            aria-label="Copiar tasa de cambio"
                         >
                             <span className="material-symbols-outlined text-[18px]">
                                 {rateCopied ? "check" : "content_copy"}
@@ -381,25 +504,25 @@ function CurrencyCalculator() {
 
             {/* Rate Comparison */}
             {mode === 'api' && (
-                <div className="grid grid-cols-2 gap-3">
-                    <div className={`glass-surface p-3 rounded-xl border-l-2 transition-all duration-300 ${rateView === 'hoy' ? 'border-l-secondary' : 'border-l-white/10'}`}>
-                        <p className="text-[10px] text-outline font-bold uppercase tracking-tighter">BCV Hoy</p>
-                        <p className={`text-on-surface font-bold text-sm transition-all duration-500 ${flashClass}`}>
-                            Bs. {todayRates.oficial > 0 ? todayRates.oficial.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                <div className="grid grid-cols-2 gap-2">
+                    <div className={`rounded-[16px] p-3 border transition-[border-color,background-color] duration-200 ${rateView === 'hoy' ? 'border-secondary/40 bg-secondary/[0.06]' : 'border-white/[0.07] bg-white/[0.03]'}`}>
+                        <p className="text-[10px] text-outline font-bold uppercase tracking-[0.12em]">BCV Hoy</p>
+                        <p className={`text-on-surface font-bold text-[15px] tracking-tight mt-0.5 transition-opacity duration-500 ${flashClass}`}>
+                            Bs. {todayRates.oficial > 0 ? todayRates.oficial.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                         </p>
                         {oficialDelta !== 0 && (
-                            <p className={`text-[9px] font-bold mt-0.5 ${oficialDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            <p className={`text-[10px] font-bold mt-0.5 ${oficialDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
                                 {oficialDelta > 0 ? '▲' : '▼'} {Math.abs(oficialDelta).toFixed(4)}
                             </p>
                         )}
                     </div>
-                    <div className={`glass-surface p-3 rounded-xl border-l-2 transition-all duration-300 ${rateView === 'manana' ? 'border-l-primary' : 'border-l-white/10'}`}>
-                        <p className="text-[10px] text-outline font-bold uppercase tracking-tighter">BCV Mañana</p>
-                        <p className="text-on-surface font-bold text-sm">
-                            Bs. {tomorrowRates.oficial > 0 ? tomorrowRates.oficial.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                    <div className={`rounded-[16px] p-3 border transition-[border-color,background-color] duration-200 ${rateView === 'manana' ? 'border-primary/40 bg-primary/[0.06]' : 'border-white/[0.07] bg-white/[0.03]'}`}>
+                        <p className="text-[10px] text-outline font-bold uppercase tracking-[0.12em]">BCV Mañana</p>
+                        <p className="text-on-surface font-bold text-[15px] tracking-tight mt-0.5">
+                            Bs. {tomorrowRates.oficial > 0 ? tomorrowRates.oficial.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                         </p>
                         {hasTomorrowRate && (
-                            <p className="text-[9px] font-bold mt-0.5 text-primary">
+                            <p className="text-[10px] font-bold mt-0.5 text-primary">
                                 ✓ Publicada
                             </p>
                         )}
@@ -407,23 +530,24 @@ function CurrencyCalculator() {
                 </div>
             )}
 
-            {/* Spread Widget (BCV vs Paralelo) */}
-            {mode === 'api' && todayRates.oficial > 0 && todayRates.paralelo > 0 && (
-                <div className="glass-surface p-3 rounded-xl flex items-center justify-between mt-1">
+            {/* Spread Widget (BCV vs USDT Binance) */}
+            {mode === 'api' && todayRates.oficial > 0 && (todayRates.usdt || todayRates.paralelo) > 0 && (
+                <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.03] px-3.5 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-outline-variant text-sm">compare_arrows</span>
-                        <span className="text-[11px] font-bold text-outline uppercase tracking-wider">Spread BCV / Paralelo</span>
+                        <span className="material-symbols-outlined text-outline text-[16px]">compare_arrows</span>
+                        <span className="text-[10px] font-bold text-outline uppercase tracking-[0.12em]">Diferencial BCV / USDT</span>
                     </div>
                     {(() => {
-                        const spread = ((todayRates.paralelo - todayRates.oficial) / todayRates.oficial) * 100;
+                        const usdtPrice = todayRates.usdt || todayRates.paralelo;
+                        const spread = ((usdtPrice - todayRates.oficial) / todayRates.oficial) * 100;
                         const isPositive = spread > 0;
                         return (
                             <div className="flex items-center gap-2">
-                                <span className={`text-[12px] font-bold ${isPositive ? 'text-red-400' : 'text-green-400'}`}>
+                                <span className={`text-[13px] font-bold ${isPositive ? 'text-secondary' : 'text-green-400'}`}>
                                     {isPositive ? '+' : ''}{spread.toFixed(2)}%
                                 </span>
-                                <span className="text-[10px] text-outline font-medium px-2 py-0.5 bg-white/5 rounded-md">
-                                    Bs. {Math.abs(todayRates.paralelo - todayRates.oficial).toFixed(2)}
+                                <span className="text-[10px] text-outline font-semibold px-2 h-6 inline-flex items-center bg-white/5 rounded-full">
+                                    Bs. {Math.abs(usdtPrice - todayRates.oficial).toFixed(2)}
                                 </span>
                             </div>
                         );
@@ -431,94 +555,137 @@ function CurrencyCalculator() {
                 </div>
             )}
 
-            {/* USDT/Paralelo mini card */}
-            {mode === 'api' && (
-                <div className="glass-surface p-3 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <CurrencyFlag code="USDT" size={20} />
-                        <span className="text-[11px] font-bold text-outline uppercase tracking-wider">USDT Binance</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="text-right border-r border-white/10 pr-3">
-                            <p className="text-[9px] text-outline font-bold uppercase">Compra</p>
-                            <span className={`font-bold text-xs transition-all duration-500 ${usdtTradeMode === 'compra' && selectedCurrency === 'USDT' ? 'text-green-400' : 'text-on-surface'}`}>
-                                Bs. {todayRates.usdtCompra > 0 ? todayRates.usdtCompra.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-                            </span>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[9px] text-outline font-bold uppercase">Venta</p>
-                            <span className={`font-bold text-xs transition-all duration-500 ${usdtTradeMode === 'venta' && selectedCurrency === 'USDT' ? 'text-red-400' : 'text-on-surface'}`}>
-                                Bs. {todayRates.usdtVenta > 0 ? todayRates.usdtVenta.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Converter Engine */}
-            <div className="space-y-4 relative py-2">
+            <div className="space-y-2 relative pt-1">
                 {/* FROM input */}
-                <div className="space-y-1.5">
-                    <label htmlFor="amountInput" className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1">Monto en {fromLabel}</label>
-                    <div className="glass-surface-active rounded-xl flex items-center px-4 h-14 border-white/10">
-                        <span className="text-primary font-bold mr-3">{fromSymbol}</span>
-                        <input
-                            id="amountInput"
-                            name="amountInput"
-                            className={`bg-transparent border-none focus:ring-0 outline-none text-on-surface font-h2 text-h2 p-0 w-full placeholder:text-outline-variant/40 transition-all duration-300 ${isSwappingAnim ? 'opacity-30 scale-95' : 'opacity-100 scale-100'}`}
-                            placeholder="0,00"
-                            type="text"
-                            value={amount}
-                            onChange={handleAmountChange}
-                            inputMode="decimal"
-                        />
+                <div className="space-y-2">
+                    <div className="well rounded-[20px] px-4 pt-3 pb-3.5 focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(66,133,244,0.15),inset_0_1px_2px_rgba(0,0,0,0.3)] transition-[border-color,box-shadow] duration-200">
+                        <label htmlFor="amountInput" className="block text-[10px] font-bold text-outline uppercase tracking-[0.14em]">Monto en {fromLabel}</label>
+                        <div className="flex items-baseline gap-2 mt-1">
+                            <span className="text-primary font-bold text-xl">{fromSymbol}</span>
+                            <input
+                                id="amountInput"
+                                name="amountInput"
+                                className={`bg-transparent border-none focus:ring-0 outline-none text-on-surface text-[32px] font-bold tracking-[-0.03em] leading-tight p-0 w-full placeholder:text-outline-variant/50 transition-[opacity,transform] duration-200 ${isSwappingAnim ? 'opacity-30 scale-95' : 'opacity-100 scale-100'}`}
+                                placeholder="0,00"
+                                type="text"
+                                value={amount}
+                                onChange={handleAmountChange}
+                                inputMode="decimal"
+                            />
+                        </div>
+                    </div>
+                    {/* Quick Amount Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                        {(isSwapped ? ['500', '1000', '2000', '5000', '10000'] : ['1', '5', '10', '20', '50', '100']).map(val => (
+                            <button
+                                key={val}
+                                type="button"
+                                onClick={() => handleQuickAmount(val)}
+                                className="press px-3 h-8 rounded-full text-[12px] font-bold bg-white/[0.04] border border-white/[0.08] text-on-surface-variant hover:text-on-surface hover:bg-white/[0.08] transition-colors duration-150 shrink-0"
+                            >
+                                {isSwapped ? 'Bs. ' : fromSymbol}{val}
+                            </button>
+                        ))}
+                        {amount && (
+                            <button
+                                type="button"
+                                onClick={() => setAmount('')}
+                                className="press px-3 h-8 rounded-full text-[12px] font-bold bg-tertiary-container/10 border border-tertiary-container/25 text-tertiary hover:bg-tertiary-container/20 transition-colors duration-150 shrink-0 ml-auto flex items-center gap-1"
+                                title="Borrar monto"
+                            >
+                                <span className="material-symbols-outlined text-[14px]">backspace</span>
+                                Borrar
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                {/* Swap Button */}
-                <div className="absolute left-1/2 -translate-x-1/2 top-[50%] -translate-y-[50%] z-10">
+                {/* Swap Button: sits on a hairline divider between input and result */}
+                <div className="flex items-center gap-3 py-0.5">
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent to-outline/25" />
                     <button
                         onClick={handleSwap}
-                        className={`w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary-fixed flex items-center justify-center shadow-lg shadow-primary/20 active:scale-90 transition-all duration-300 ${isSwapped ? 'rotate-180' : ''}`}
+                        className={`w-11 h-11 rounded-full thumb-primary flex items-center justify-center active:scale-[0.92] transition-transform duration-300 shadow-md ${isSwapped ? 'rotate-180' : ''}`}
+                        style={{ transitionTimingFunction: 'var(--ease-apple)' }}
                         title={isSwapped ? `${toLabel} → ${fromLabel}` : `${fromLabel} → ${toLabel}`}
+                        aria-label="Invertir conversión"
                     >
-                        <span className="material-symbols-outlined font-bold">swap_vert</span>
+                        <span className="material-symbols-outlined font-bold text-[20px]">swap_vert</span>
                     </button>
+                    <div className="flex-1 h-px bg-gradient-to-l from-transparent to-outline/25" />
                 </div>
 
                 {/* TO result */}
-                <div className="space-y-1.5 pt-2">
-                    <div className="text-[11px] font-bold text-outline uppercase tracking-widest pl-1 flex items-center justify-between">
-                        <span>Resultado en {toLabel}</span>
-                        <button onClick={() => setShowTools(!showTools)} className={`text-primary transition-all active:scale-90 flex items-center gap-1 ${showTools ? 'opacity-100' : 'opacity-60'}`}>
-                            <span className="text-[10px] uppercase tracking-wider">{showTools ? 'Ocultar extras' : 'Más herramientas'}</span>
-                            <span className={`material-symbols-outlined text-[14px] transition-transform ${showTools ? 'rotate-180' : ''}`}>expand_more</span>
-                        </button>
-                    </div>
-                    <div className="glass-surface rounded-xl flex items-center justify-between px-4 h-20 border-primary/20">
-                        <p className={`text-primary font-numeral-display text-h1 transition-all duration-300 ${isSwappingAnim ? 'opacity-30 scale-95' : 'opacity-100 scale-100'} min-w-0 truncate`}>
-                            {result ? `${toSymbol} ${result}` : `${toSymbol} 0,00`}
-                        </p>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            {result && (
-                                <button onClick={() => setShowMostrador(true)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-secondary hover:text-on-surface transition-colors active:scale-90" title="Mostrar en pantalla completa">
-                                    <span className="material-symbols-outlined text-sm">fullscreen</span>
+                <div className="space-y-2">
+                    <div
+                        onClick={handleCopyResult}
+                        className="card-sheen relative overflow-hidden rounded-[24px] px-5 pt-3.5 pb-4 cursor-pointer select-none text-white active:scale-[0.985] transition-transform duration-150"
+                        style={{
+                            background: 'radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,0.25) 0%, transparent 45%), linear-gradient(140deg, #5090f7 0%, #3a76de 50%, #1a56c4 100%)',
+                            boxShadow: 'inset 0 1px 1px 0 rgba(255,255,255,0.45), inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 -1px 1px 0 rgba(0,0,0,0.25), 0 16px 36px -12px rgba(66,133,244,0.75)',
+                            transitionTimingFunction: 'var(--ease-apple)'
+                        }}
+                        title="Toca para copiar monto"
+                        role="button"
+                        aria-label={`Resultado ${result || '0,00'}. Toca para copiar`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/75">Resultado en {toLabel}</span>
+                            <div className="flex items-center gap-1.5">
+                                {result && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setShowMostrador(true); }}
+                                        className="press w-8 h-8 rounded-full bg-white/[0.16] hover:bg-white/[0.24] flex items-center justify-center text-white transition-colors"
+                                        title="Mostrar en pantalla completa"
+                                        aria-label="Mostrar en pantalla completa"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">fullscreen</span>
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleCopy(); }}
+                                    className="press w-8 h-8 rounded-full bg-white/[0.16] hover:bg-white/[0.24] flex items-center justify-center text-white transition-colors"
+                                    title="Copiar formato completo"
+                                    aria-label="Copiar formato completo"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">{copied ? "check" : "content_copy"}</span>
                                 </button>
-                            )}
-                            <button onClick={handleCopy} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-outline hover:text-on-surface transition-colors active:scale-90" title="Copiar monto">
-                                <span className="material-symbols-outlined text-sm">{copied ? "check" : "content_copy"}</span>
-                            </button>
+                            </div>
                         </div>
+                        <p className={`text-[38px] leading-[1.05] font-extrabold tracking-[-0.04em] mt-1 truncate transition-[opacity,transform] duration-200 ${isSwappingAnim ? 'opacity-30 scale-95' : 'opacity-100 scale-100'}`}>
+                            <span className="text-white/70 text-[24px] font-bold mr-1.5">{toSymbol}</span>{result || '0,00'}
+                        </p>
+                        <p className="text-[11px] text-white/75 flex items-center gap-1 mt-1.5 font-medium">
+                            <span className="material-symbols-outlined text-[14px]">touch_app</span>
+                            Toca para copiar el monto para tu banco
+                        </p>
                     </div>
+                    {resultCopied && (
+                        <div className="bg-primary/15 border border-primary/30 text-primary text-xs font-bold h-8 px-3 rounded-full flex items-center justify-center animate-fade-in-up">
+                            ✓ Monto copiado para tu banco: {result}
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setShowTools(!showTools)}
+                        aria-expanded={showTools}
+                        className="press w-full h-9 rounded-full flex items-center justify-center gap-1 text-[11px] font-bold uppercase tracking-[0.12em] text-outline hover:text-primary transition-colors"
+                    >
+                        {showTools ? 'Ocultar extras' : 'Vuelto, dividir y propina'}
+                        <span className={`material-symbols-outlined text-[16px] transition-transform duration-200 ${showTools ? 'rotate-180' : ''}`}>expand_more</span>
+                    </button>
                 </div>
 
                 {/* Extra Tools Section */}
-                <div className={`transition-all duration-400 ease-in-out overflow-hidden ${showTools ? 'max-h-[300px] opacity-100 pt-2' : 'max-h-0 opacity-0'}`}>
-                    <div className="glass-surface border border-white/5 rounded-xl p-3">
-                        <div className="flex gap-1 mb-3 bg-white/5 p-1 rounded-lg">
-                            <button onClick={() => setActiveTool('mixto')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'mixto' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Mixto/Vuelto</button>
-                            <button onClick={() => setActiveTool('split')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'split' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Dividir</button>
-                            <button onClick={() => setActiveTool('propina')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTool === 'propina' ? 'bg-primary text-on-primary-fixed' : 'text-outline hover:text-on-surface'}`}>Propina</button>
+                <div className={`transition-[max-height,opacity,padding] duration-300 overflow-hidden ${showTools ? 'max-h-[340px] opacity-100' : 'max-h-0 opacity-0'}`} style={{ transitionTimingFunction: 'var(--ease-out)' }}>
+                    <div className="rounded-[18px] border border-white/[0.07] bg-white/[0.03] p-3">
+                        <div className="well grid grid-cols-3 gap-1 mb-3 p-1 rounded-[14px]">
+                            <button onClick={() => setActiveTool('mixto')} className={`press h-8 text-[10px] font-bold uppercase tracking-[0.08em] rounded-[10px] transition-[background-color,color,box-shadow] duration-200 ${activeTool === 'mixto' ? 'thumb-primary' : 'text-outline hover:text-on-surface'}`}>Mixto/Vuelto</button>
+                            <button onClick={() => setActiveTool('split')} className={`press h-8 text-[10px] font-bold uppercase tracking-[0.08em] rounded-[10px] transition-[background-color,color,box-shadow] duration-200 ${activeTool === 'split' ? 'thumb-primary' : 'text-outline hover:text-on-surface'}`}>Dividir</button>
+                            <button onClick={() => setActiveTool('propina')} className={`press h-8 text-[10px] font-bold uppercase tracking-[0.08em] rounded-[10px] transition-[background-color,color,box-shadow] duration-200 ${activeTool === 'propina' ? 'thumb-primary' : 'text-outline hover:text-on-surface'}`}>Propina</button>
                         </div>
 
                         {activeTool === 'mixto' && (
@@ -530,8 +697,8 @@ function CurrencyCalculator() {
                                     </div>
                                 </div>
                                 {(() => {
-                                    const numTotal = parseFloat(amount.replace(/\./g, '').replace(',', '.')) || 0;
-                                    const numCash = parseFloat(cashGiven.replace(/\./g, '').replace(',', '.')) || 0;
+                                    const numTotal = parseFloat(amount.replace(/[\s\u00a0\u202f.]/g, '').replace(',', '.')) || 0;
+                                    const numCash = parseFloat(cashGiven.replace(/[\s\u00a0\u202f.]/g, '').replace(',', '.')) || 0;
                                     const rate = getRateForDisplay();
                                     if (numTotal === 0 || rate === 0) return null;
                                     
@@ -576,7 +743,7 @@ function CurrencyCalculator() {
                                     </div>
                                 </div>
                                 {(() => {
-                                    const numResult = parseFloat(result.replace(/\./g, '').replace(',', '.'));
+                                    const numResult = parseFloat(result.replace(/[\s\u00a0\u202f.]/g, '').replace(',', '.'));
                                     if (isNaN(numResult) || numResult === 0) return null;
                                     const splitAmount = numResult / splitWays;
                                     const formatted = splitAmount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -603,7 +770,7 @@ function CurrencyCalculator() {
                                     </div>
                                 </div>
                                 {(() => {
-                                    const numResult = parseFloat(result.replace(/\./g, '').replace(',', '.'));
+                                    const numResult = parseFloat(result.replace(/[\s\u00a0\u202f.]/g, '').replace(',', '.'));
                                     if (isNaN(numResult) || numResult === 0) return null;
                                     const tipAmount = numResult * (tipPercent / 100);
                                     const totalWithTip = numResult + tipAmount;
@@ -670,7 +837,7 @@ function CurrencyCalculator() {
             {/* Mostrador Fullscreen Modal */}
             {showMostrador && (
                 <div className="fixed inset-0 z-[100] bg-surface/95 backdrop-blur-2xl flex flex-col justify-center items-center animate-fade-in px-6">
-                    <button onClick={() => setShowMostrador(false)} className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-outline hover:text-on-surface transition-all active:scale-90">
+                    <button onClick={() => setShowMostrador(false)} aria-label="Cerrar" className="press absolute top-6 right-6 w-12 h-12 rounded-full well flex items-center justify-center text-outline hover:text-on-surface transition-colors">
                         <span className="material-symbols-outlined text-xl">close</span>
                     </button>
                     <div className="text-center w-full max-w-sm">
@@ -683,17 +850,18 @@ function CurrencyCalculator() {
                             <CurrencyFlag code={targetCurrency} size={24} />
                         </p>
                         
-                        <div className="glass-surface p-4 rounded-2xl mx-auto w-full max-w-[280px]">
+                        <div className="card-glass p-4 mx-auto w-full max-w-[280px]">
                             <p className="text-xs text-outline mb-1">Referencia ({selectedCurrency})</p>
                             <p className="text-on-surface font-bold text-lg">{fromSymbol} {amount || '0,00'}</p>
                             <div className="w-full h-px bg-white/10 my-3"></div>
                             <p className="text-[10px] text-outline font-bold uppercase tracking-wider mb-0.5">Tasa aplicada</p>
-                            <p className="text-sm font-semibold text-secondary">Bs. {displayRate > 0 ? displayRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—'}</p>
+                            <p className="text-sm font-semibold text-secondary">Bs. {displayRate > 0 ? displayRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '-'}</p>
                         </div>
                     </div>
                 </div>
             )}
         </article>
+        </div>
     );
 }
 

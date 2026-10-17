@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════
-   PAGO MÓVIL POCKET — LOGO PALETTE DESIGN SYSTEM
+   PAGO MÓVIL POCKET - LOGO PALETTE DESIGN SYSTEM
    Design by Stitch • Implemented by ARTKING47
    
    All colors derive from the app logo:
@@ -15,11 +15,27 @@
    Surface:          #0d0f1c (deep navy)
    ═══════════════════════════════════════════════════════ */
 
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-apple: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Surface tokens (Apple Aero Dark) */
+  --shell-bg: rgba(255, 255, 255, 0.035);
+  --shell-border: rgba(255, 255, 255, 0.09);
+  --core-bg: linear-gradient(165deg, rgba(30, 34, 52, 0.88) 0%, rgba(18, 20, 34, 0.94) 100%);
+  --core-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
+  --core-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 16px 36px -12px rgba(0, 0, 0, 0.55);
+  --hairline: rgba(255, 255, 255, 0.08);
+}
+
 /* ═══════ GLOBAL RESET ═══════ */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
@@ -34,13 +50,47 @@ body {
   background: #0d0f1c;
   color: #e0e6f7;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   line-height: 1.5;
-  transition: background 0.4s ease, color 0.3s ease;
+  font-feature-settings: 'cv11', 'ss01';
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.4s ease, color 0.3s ease;
+}
+
+/* Ambient liquid mesh glow: multi-orb atmospheric light for true Aero refraction */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 50% at 12% 0%, rgba(66, 133, 244, 0.22) 0%, transparent 65%),
+    radial-gradient(55% 45% at 95% 15%, rgba(245, 197, 24, 0.12) 0%, transparent 60%),
+    radial-gradient(60% 45% at 50% 85%, rgba(79, 70, 229, 0.14) 0%, transparent 65%),
+    radial-gradient(40% 35% at 5% 55%, rgba(6, 182, 212, 0.08) 0%, transparent 60%);
+}
+
+html.light body::before {
+  background:
+    radial-gradient(70% 50% at 12% 0%, rgba(66, 133, 244, 0.15) 0%, transparent 65%),
+    radial-gradient(55% 45% at 95% 15%, rgba(245, 197, 24, 0.12) 0%, transparent 60%),
+    radial-gradient(60% 45% at 50% 85%, rgba(66, 133, 244, 0.10) 0%, transparent 65%),
+    radial-gradient(40% 35% at 5% 55%, rgba(14, 165, 233, 0.08) 0%, transparent 60%);
+}
+
+html.light {
+  --shell-bg: rgba(255, 255, 255, 0.55);
+  --shell-border: rgba(20, 30, 70, 0.08);
+  --core-bg: linear-gradient(180deg, #ffffff 0%, #f6f8fe 100%);
+  --core-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(255, 255, 255, 0.8), inset 0 -1px 1px 0 rgba(20, 30, 70, 0.04);
+  --core-shadow: 0 1px 3px rgba(20, 30, 70, 0.06), 0 14px 34px -14px rgba(20, 30, 70, 0.16);
+  --hairline: rgba(20, 30, 70, 0.09);
 }
 
 /* ═══════════════════════════════════════════
-   LIGHT THEME — Complete override system
+   LIGHT THEME: Complete override system
    ═══════════════════════════════════════════ */
 
 html.light body {
@@ -65,20 +115,15 @@ html.light nav {
 
 /* ── Glass surfaces → white frosted glass in light ── */
 html.light .glass-surface {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(20, 30, 70, 0.07);
+  box-shadow: 0 1px 2px rgba(20, 30, 70, 0.04);
 }
 
 html.light .glass-surface-active {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: rgba(0, 0, 0, 0.10);
-}
-
-html.light .card-glass {
-  background: rgba(255, 255, 255, 0.70);
-  border-color: rgba(0, 0, 0, 0.06);
+  background: #ffffff;
+  border-color: rgba(20, 30, 70, 0.10);
+  box-shadow: 0 1px 2px rgba(20, 30, 70, 0.05);
 }
 
 /* ── Input & form in light ── */
@@ -154,6 +199,13 @@ html.light [class*="bg-white/\\[0\\.06\\]"],
 html.light [class*="bg-white/[0.06]"] {
   background-color: rgba(0, 0, 0, 0.04) !important;
 }
+html.light [class*="bg-white/[0.03]"] {
+  background-color: rgba(20, 30, 70, 0.025) !important;
+}
+html.light [class*="border-white/[0.07]"],
+html.light [class*="border-white/[0.08]"] {
+  border-color: rgba(20, 30, 70, 0.08) !important;
+}
 
 /* ── Broad border overrides ── */
 html.light [class*="border-white\\/5"],
@@ -179,26 +231,238 @@ html.light ::selection {
   color: #1a1d30;
 }
 
-/* ═══════ GLASS COMPONENTS (Dark default) ═══════ */
+/* ═══════ GLASS COMPONENTS (Apple Aero System) ═══════ */
 
 .glass-surface {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.14), 0 2px 8px -2px rgba(0, 0, 0, 0.25);
 }
 
 .glass-surface-active {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.04) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -2px rgba(0, 0, 0, 0.35);
+}
+
+/* Translucent Apple Aero Material */
+.glass-aero {
+  background: var(--core-bg);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--core-highlight), var(--core-shadow);
+  backdrop-filter: blur(24px) saturate(175%);
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+}
+
+/* Apple Wallet / Titanium Card Sheen */
+.card-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.card-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    125deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.03) 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.03) 75%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  border-radius: inherit;
+}
+html.light .card-sheen::after {
+  background: linear-gradient(
+    125deg,
+    rgba(255, 255, 255, 0.45) 0%,
+    rgba(255, 255, 255, 0.08) 35%,
+    transparent 60%
+  );
 }
 
 .card-glass {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  background: var(--core-bg);
+  border: 1px solid var(--hairline);
+  border-radius: 24px;
+  box-shadow: var(--core-highlight), var(--core-shadow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ═══════ DOUBLE-BEZEL (outer shell + inner core) ═══════ */
+
+.bezel {
+  padding: 6px;
+  border-radius: 30px;
+  background: var(--shell-bg);
+  border: 1px solid var(--shell-border);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.bezel-core {
+  border-radius: 24px;
+  background: var(--core-bg);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--core-highlight), var(--core-shadow);
+}
+
+/* Recessed well: inputs and segmented tracks sit into the core */
+.well {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 2px 4px 0 rgba(0, 0, 0, 0.42),
+    0 1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+html.light .well {
+  background: rgba(20, 30, 70, 0.04);
+  border: 1px solid rgba(20, 30, 70, 0.07);
+  box-shadow:
+    inset 0 1.5px 3px 0 rgba(20, 30, 70, 0.08),
+    0 1px 0 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Raised chip used as the active thumb of segmented controls (Apple iOS style) */
+.thumb-primary {
+  background: linear-gradient(180deg, #5b96f8 0%, #4285F4 50%, #2f74e6 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.25),
+    0 4px 14px -3px rgba(66, 133, 244, 0.65);
+}
+
+.thumb-neutral {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
+  color: #e0e6f7;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 8px -2px rgba(0, 0, 0, 0.4);
+}
+
+html.light .thumb-neutral {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6fc 100%);
+  color: #1a1d30;
+  border: 1px solid rgba(20, 30, 70, 0.12);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 1),
+    0 2px 6px -2px rgba(20, 30, 70, 0.12);
+}
+
+/* Eyebrow tag above section titles */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6fa3f8;
+  background: rgba(66, 133, 244, 0.08);
+  border: 1px solid rgba(66, 133, 244, 0.18);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.eyebrow-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: #F5C518;
+  box-shadow: 0 0 8px rgba(245, 197, 24, 0.7);
+}
+
+html.light .eyebrow {
+  color: #1a56c4;
+  background: rgba(66, 133, 244, 0.08);
+  border-color: rgba(66, 133, 244, 0.18);
+}
+
+/* Tactile press feedback (Apple: responsive on pointer-down, spring curve) */
+.press {
+  transition:
+    transform 120ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+  will-change: transform;
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+/* ═══════ FLOATING NAV ISLAND (Apple Aero Floating Capsule) ═══════ */
+
+.nav-island {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  max-width: 30rem;
+  margin: 0 auto;
+  z-index: 50;
+  border-radius: 28px;
+  padding: 6px;
+  background: rgba(18, 21, 35, 0.82) !important;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35),
+    0 20px 48px -10px rgba(0, 0, 0, 0.65);
+}
+
+html.light .nav-island {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: rgba(20, 30, 70, 0.10) !important;
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 1),
+    0 20px 44px -14px rgba(20, 30, 70, 0.22);
+}
+
+.nav-item-active-bg {
+  background: linear-gradient(180deg, rgba(66, 133, 244, 0.22) 0%, rgba(66, 133, 244, 0.10) 100%);
+  border: 1px solid rgba(66, 133, 244, 0.32);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.28),
+    0 2px 8px -2px rgba(66, 133, 244, 0.45);
+}
+
+html.light .nav-item-active-bg {
+  background: linear-gradient(180deg, rgba(66, 133, 244, 0.16) 0%, rgba(66, 133, 244, 0.06) 100%);
+  border: 1px solid rgba(66, 133, 244, 0.28);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.8),
+    0 2px 6px -2px rgba(66, 133, 244, 0.25);
+}
+
+/* Top app bar (Apple Translucent Header) */
+.app-bar {
+  background: rgba(13, 15, 28, 0.65) !important;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px -6px rgba(0, 0, 0, 0.35);
+}
+
+html.light .app-bar {
+  background: rgba(240, 244, 255, 0.82) !important;
+  border-bottom: 1px solid rgba(20, 30, 70, 0.08) !important;
+  box-shadow: 0 4px 20px -8px rgba(20, 30, 70, 0.08);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -221,7 +485,7 @@ html.light ::selection {
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 1rem;
   font-weight: 500;
-  transition: all 0.25s ease;
+  transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), background-color 180ms var(--ease-out);
   outline: none;
 }
 
@@ -253,7 +517,7 @@ html.light ::selection {
   font-size: 0.9rem;
   cursor: pointer;
   border: none;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 160ms var(--ease-out), background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -268,21 +532,23 @@ html.light ::selection {
   border: 1px solid rgba(66, 133, 244, 0.3);
 }
 
-.btn-glass-primary:hover {
-  filter: brightness(1.1);
-  box-shadow: 0 0 24px rgba(66, 133, 244, 0.2);
-}
-
 .btn-glass-secondary {
   background: rgba(255, 255, 255, 0.04);
   color: #bbcabf;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.btn-glass-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #dde4dd;
-  border-color: rgba(255, 255, 255, 0.12);
+@media (hover: hover) and (pointer: fine) {
+  .btn-glass-primary:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 0 20px rgba(66, 133, 244, 0.25);
+  }
+
+  .btn-glass-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #dde4dd;
+    border-color: rgba(255, 255, 255, 0.14);
+  }
 }
 
 /* ═══════ BADGES ═══════ */
@@ -369,14 +635,26 @@ html.light ::selection {
 
 /* ═══════ KEYFRAMES ═══════ */
 
+/* ═══════ KEYFRAMES ═══════ */
+
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes modalEnter {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes overlayFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes flipIn {
@@ -386,17 +664,17 @@ html.light ::selection {
 
 @keyframes pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.03); opacity: 0.85; }
+  50% { transform: scale(1.02); opacity: 0.9; }
 }
 
 @keyframes gentleFloat {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  50% { transform: translateY(-4px); }
 }
 
 @keyframes loadingDot {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1.2); }
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1.15); }
 }
 
 @keyframes particleFloat {
@@ -415,16 +693,26 @@ html.light ::selection {
 
 @layer utilities {
   .animate-fade-in-up {
-    animation: fadeInUp 0.4s ease-out forwards;
-  }
-  .animate-flip-in {
-    animation: flipIn 0.5s ease-out forwards;
-  }
-  .animate-pulse-card {
-    animation: pulse 2s ease-in-out infinite;
+    animation: fadeInUp 220ms var(--ease-out) forwards;
   }
   .animate-slide-down {
-    animation: slideDown 0.35s ease-out forwards;
+    animation: slideDown 200ms var(--ease-out) forwards;
+  }
+  .animate-modal-enter {
+    animation: modalEnter 180ms var(--ease-out) forwards;
+    transform-origin: center;
+  }
+  .animate-overlay {
+    animation: overlayFade 160ms ease-out forwards;
+  }
+  .animate-fade-in {
+    animation: overlayFade 200ms var(--ease-out) forwards;
+  }
+  .animate-flip-in {
+    animation: flipIn 240ms var(--ease-out) forwards;
+  }
+  .animate-pulse-card {
+    animation: pulse 2.5s ease-in-out infinite;
   }
   .animate-gentle-float {
     animation: gentleFloat 3s ease-in-out infinite;
@@ -500,4 +788,24 @@ html.light .recharts-text {
 ::selection {
   background: rgba(66, 133, 244, 0.22);
   color: #e0e6f7;
+}
+
+/* ═══════ ACCESSIBILITY: REDUCED MOTION ═══════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-gentle-float,
+  .animate-pulse-card,
+  .animate-shimmer,
+  .splash-orb-1,
+  .splash-orb-2,
+  .splash-orb-3 {
+    animation: none !important;
+  }
 }

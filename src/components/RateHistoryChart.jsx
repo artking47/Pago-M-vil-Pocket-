@@ -36,7 +36,7 @@ function CustomTooltip({ active, payload, label }) {
                 <div key={i} className="flex items-center gap-2 mb-0.5">
                     <div className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
                     <span className="text-on-surface font-medium">{entry.name}:</span>
-                    <span className="text-primary font-bold">Bs. {entry.value?.toFixed(2)}</span>
+                    <span className="text-primary font-bold">Bs. {typeof entry.value === 'number' && !isNaN(entry.value) ? entry.value.toFixed(2) : '-'}</span>
                 </div>
             ))}
         </div>
@@ -67,7 +67,7 @@ function RateHistoryChart() {
         return new Set(getAvailableDates());
     }, [historicalData, getAvailableDates]);
 
-    // Chart data — last N days
+    // Chart data: last N days
     const chartData = useMemo(() => {
         if (!historicalData || historicalData.length === 0) return [];
 
@@ -181,213 +181,225 @@ function RateHistoryChart() {
     return (
         <div className="space-y-4 animate-fade-in-up">
             {/* ── Chart Section ── */}
-            <article className="glass-surface rounded-2xl p-md">
-                {/* Chart Header */}
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center">
-                            <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
-                        </div>
-                        <div>
-                            <h3 className="text-on-surface font-h3 text-h3 leading-none">Tendencia</h3>
-                            <p className="text-[12px] text-outline">Evolución del dólar</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Range Selector */}
-                <div className="flex gap-1.5 mb-4">
-                    {RANGES.map(r => (
-                        <button
-                            key={r.days}
-                            onClick={() => setChartRange(r.days)}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95
-                                ${chartRange === r.days
-                                    ? 'bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20'
-                                    : 'bg-white/5 text-outline hover:text-on-surface hover:bg-white/10'
-                                }`}
-                        >
-                            {r.label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Chart */}
-                {chartData.length > 0 ? (
-                    <div className="h-52 -mx-2">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="gradBcv" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#4285F4" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#4285F4" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="gradParalelo" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#F5C518" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#F5C518" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis
-                                    dataKey="label"
-                                    tick={{ fontSize: 10, fill: '#8891b8' }}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    interval="preserveStartEnd"
-                                />
-                                <YAxis
-                                    tick={{ fontSize: 10, fill: '#8891b8' }}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    domain={['auto', 'auto']}
-                                    tickFormatter={v => v.toFixed(1)}
-                                />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend
-                                    iconType="circle"
-                                    iconSize={8}
-                                    wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="bcv"
-                                    name="BCV Oficial"
-                                    stroke="#4285F4"
-                                    strokeWidth={2.5}
-                                    fill="url(#gradBcv)"
-                                    dot={false}
-                                    activeDot={{ r: 4, strokeWidth: 2, fill: '#4285F4' }}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="paralelo"
-                                    name="Paralelo"
-                                    stroke="#F5C518"
-                                    strokeWidth={2}
-                                    fill="url(#gradParalelo)"
-                                    dot={false}
-                                    activeDot={{ r: 4, strokeWidth: 2, fill: '#F5C518' }}
-                                    strokeDasharray="5 3"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                ) : (
-                    <div className="h-52 flex items-center justify-center text-outline text-sm">
-                        <div className="text-center space-y-2">
-                            <span className="material-symbols-outlined text-3xl text-outline-variant">hourglass_empty</span>
-                            <p>Cargando datos históricos...</p>
-                        </div>
-                    </div>
-                )}
-            </article>
-
-            {/* ── Calendar Section ── */}
-            <article className="glass-surface rounded-2xl p-md">
-                {/* Calendar Header */}
-                <button
-                    onClick={() => setShowCalendar(!showCalendar)}
-                    className="w-full flex items-center justify-between mb-3"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                            <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
-                        </div>
-                        <div className="text-left">
-                            <h3 className="text-on-surface font-h3 text-h3 leading-none">Calendario</h3>
-                            <p className="text-[12px] text-outline">Consulta tasas por fecha</p>
-                        </div>
-                    </div>
-                    <span className={`material-symbols-outlined text-outline transition-transform duration-300 ${showCalendar ? 'rotate-180' : ''}`}>
-                        expand_more
-                    </span>
-                </button>
-
-                <div className={`overflow-hidden transition-all duration-400 ease-in-out ${showCalendar ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                    {/* Month Navigation */}
-                    <div className="flex items-center justify-between mb-3 px-1">
-                        <button
-                            onClick={goToPrevMonth}
-                            className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-outline hover:text-on-surface hover:bg-white/10 transition-all active:scale-90"
-                        >
-                            <span className="material-symbols-outlined text-lg">chevron_left</span>
-                        </button>
-                        <h4 className="text-on-surface font-semibold text-sm tracking-wide">
-                            {MONTHS_ES[viewMonth]} {viewYear}
-                        </h4>
-                        <button
-                            onClick={goToNextMonth}
-                            disabled={isNextDisabled}
-                            className={`w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center transition-all active:scale-90
-                                ${isNextDisabled ? 'text-outline-variant/30 cursor-not-allowed' : 'text-outline hover:text-on-surface hover:bg-white/10'}`}
-                        >
-                            <span className="material-symbols-outlined text-lg">chevron_right</span>
-                        </button>
-                    </div>
-
-                    {/* Day Headers */}
-                    <div className="grid grid-cols-7 gap-1 mb-1">
-                        {DAYS_ES.map(day => (
-                            <div key={day} className="h-8 flex items-center justify-center text-[10px] font-bold text-outline uppercase tracking-wider">
-                                {day}
+            <div className="bezel">
+                <article className="bezel-core card-sheen p-4 sm:p-5">
+                    {/* Chart Header */}
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-[13px] bg-secondary/15 border border-secondary/25 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
                             </div>
+                            <div>
+                                <h3 className="text-on-surface text-[17px] font-bold tracking-[-0.02em] leading-none">Tendencia</h3>
+                                <p className="text-[11px] text-outline mt-1">Evolución BCV Oficial vs USDT</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Range Selector */}
+                    <div className="well grid grid-cols-4 gap-1 p-1 rounded-[16px] mb-4">
+                        {RANGES.map(r => (
+                            <button
+                                key={r.days}
+                                type="button"
+                                onClick={() => setChartRange(r.days)}
+                                className={`press h-8 rounded-[12px] text-[11px] font-bold uppercase tracking-wider transition-[background-color,color,box-shadow] duration-200
+                                    ${chartRange === r.days
+                                        ? 'thumb-primary'
+                                        : 'text-outline hover:text-on-surface'
+                                    }`}
+                            >
+                                {r.label}
+                            </button>
                         ))}
                     </div>
 
-                    {/* Calendar Grid */}
-                    <div className="grid grid-cols-7 gap-1">
-                        {calendarGrid}
-                    </div>
-
-                    {/* Selected Date Detail */}
-                    {selectedDate && (
-                        <div className="mt-4 animate-slide-down">
-                            <div className="bg-white/[0.04] rounded-xl p-4 border border-white/5">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-primary text-lg">event</span>
-                                        <span className="text-on-surface font-bold text-sm">
-                                            {new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-VE', {
-                                                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                                            })}
-                                        </span>
-                                    </div>
-                                    <button
-                                        onClick={() => { setSelectedDate(null); setSelectedDateRates(null); }}
-                                        className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center text-outline hover:text-on-surface transition-all active:scale-90"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">close</span>
-                                    </button>
-                                </div>
-
-                                {selectedDateRates ? (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {/* BCV Rate */}
-                                        <div className="bg-white/[0.04] rounded-xl p-3 border-l-2 border-l-primary">
-                                            <p className="text-[10px] text-outline font-bold uppercase tracking-wider mb-1">BCV Oficial</p>
-                                            <p className="text-primary font-bold text-lg">
-                                                Bs. {selectedDateRates.oficial?.toFixed(2) || '—'}
-                                            </p>
-                                        </div>
-                                        {/* Paralelo Rate */}
-                                        <div className="bg-white/[0.04] rounded-xl p-3 border-l-2 border-l-secondary">
-                                            <p className="text-[10px] text-outline font-bold uppercase tracking-wider mb-1">Paralelo</p>
-                                            <p className="text-secondary font-bold text-lg">
-                                                Bs. {selectedDateRates.paralelo?.toFixed(2) || '—'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-4 text-outline text-sm">
-                                        <span className="material-symbols-outlined text-2xl text-outline-variant mb-1 block">event_busy</span>
-                                        No hay datos disponibles para esta fecha
-                                    </div>
-                                )}
+                    {/* Chart */}
+                    {chartData.length > 0 ? (
+                        <div className="h-56 -mx-2">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="gradBcv" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#4285F4" stopOpacity={0.35} />
+                                            <stop offset="95%" stopColor="#4285F4" stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="gradParalelo" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#F5C518" stopOpacity={0.35} />
+                                            <stop offset="95%" stopColor="#F5C518" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis
+                                        dataKey="label"
+                                        tick={{ fontSize: 10, fill: '#8891b8' }}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        interval="preserveStartEnd"
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 10, fill: '#8891b8' }}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        domain={['auto', 'auto']}
+                                        tickFormatter={v => (typeof v === 'number' && !isNaN(v)) ? v.toFixed(1) : ''}
+                                    />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Legend
+                                        iconType="circle"
+                                        iconSize={8}
+                                        wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="bcv"
+                                        name="BCV Oficial"
+                                        stroke="#4285F4"
+                                        strokeWidth={2.5}
+                                        fill="url(#gradBcv)"
+                                        dot={false}
+                                        activeDot={{ r: 4, strokeWidth: 2, fill: '#4285F4' }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="paralelo"
+                                        name="USDT Mercado"
+                                        stroke="#F5C518"
+                                        strokeWidth={2}
+                                        fill="url(#gradParalelo)"
+                                        dot={false}
+                                        activeDot={{ r: 4, strokeWidth: 2, fill: '#F5C518' }}
+                                        strokeDasharray="5 3"
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <div className="h-56 flex items-center justify-center text-outline text-sm">
+                            <div className="text-center space-y-2">
+                                <span className="material-symbols-outlined text-3xl text-outline-variant animate-pulse">hourglass_empty</span>
+                                <p>Cargando datos históricos...</p>
                             </div>
                         </div>
                     )}
-                </div>
-            </article>
+                </article>
+            </div>
+
+            {/* ── Calendar Section ── */}
+            <div className="bezel">
+                <article className="bezel-core card-sheen p-4 sm:p-5">
+                    {/* Calendar Header */}
+                    <button
+                        type="button"
+                        onClick={() => setShowCalendar(!showCalendar)}
+                        className="press w-full flex items-center justify-between mb-3 text-left"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-[13px] bg-primary/15 border border-primary/25 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
+                            </div>
+                            <div>
+                                <h3 className="text-on-surface text-[17px] font-bold tracking-[-0.02em] leading-none">Calendario</h3>
+                                <p className="text-[11px] text-outline mt-1">Consulta tasas por fecha histórica</p>
+                            </div>
+                        </div>
+                        <span className={`w-8 h-8 rounded-full well flex items-center justify-center text-outline transition-transform duration-200 ${showCalendar ? 'rotate-180' : ''}`}>
+                            <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                        </span>
+                    </button>
+
+                    <div className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out ${showCalendar ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                        {/* Month Navigation */}
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <button
+                                type="button"
+                                onClick={goToPrevMonth}
+                                className="press w-8 h-8 rounded-full well flex items-center justify-center text-outline hover:text-on-surface transition-colors"
+                                aria-label="Mes anterior"
+                            >
+                                <span className="material-symbols-outlined text-base">chevron_left</span>
+                            </button>
+                            <h4 className="text-on-surface font-bold text-sm tracking-wide">
+                                {MONTHS_ES[viewMonth]} {viewYear}
+                            </h4>
+                            <button
+                                type="button"
+                                onClick={goToNextMonth}
+                                disabled={isNextDisabled}
+                                className={`press w-8 h-8 rounded-full well flex items-center justify-center transition-colors
+                                    ${isNextDisabled ? 'text-outline-variant/30 cursor-not-allowed opacity-40' : 'text-outline hover:text-on-surface'}`}
+                                aria-label="Mes siguiente"
+                            >
+                                <span className="material-symbols-outlined text-base">chevron_right</span>
+                            </button>
+                        </div>
+
+                        {/* Day Headers */}
+                        <div className="grid grid-cols-7 gap-1 mb-1">
+                            {DAYS_ES.map(day => (
+                                <div key={day} className="h-8 flex items-center justify-center text-[10px] font-bold text-outline uppercase tracking-wider">
+                                    {day}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Calendar Grid */}
+                        <div className="grid grid-cols-7 gap-1">
+                            {calendarGrid}
+                        </div>
+
+                        {/* Selected Date Detail */}
+                        {selectedDate && (
+                            <div className="mt-4 animate-slide-down">
+                                <div className="well rounded-[18px] p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary text-lg">event</span>
+                                            <span className="text-on-surface font-bold text-sm">
+                                                {new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-VE', {
+                                                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                                                })}
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSelectedDate(null); setSelectedDateRates(null); }}
+                                            className="press w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-outline hover:text-on-surface transition-colors"
+                                            aria-label="Cerrar detalle"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+
+                                    {selectedDateRates ? (
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            {/* BCV Rate */}
+                                            <div className="card-glass p-3 border-l-2 border-l-primary">
+                                                <p className="text-[10px] text-outline font-bold uppercase tracking-wider mb-0.5">BCV Oficial</p>
+                                                <p className="text-primary font-bold text-lg">
+                                                    Bs. {selectedDateRates.oficial?.toFixed(2) || '-'}
+                                                </p>
+                                            </div>
+                                            {/* USDT Rate */}
+                                            <div className="card-glass p-3 border-l-2 border-l-secondary">
+                                                <p className="text-[10px] text-outline font-bold uppercase tracking-wider mb-0.5">USDT Binance</p>
+                                                <p className="text-secondary font-bold text-lg">
+                                                    Bs. {selectedDateRates.paralelo?.toFixed(2) || '-'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-4 text-outline text-sm">
+                                            <span className="material-symbols-outlined text-2xl text-outline-variant mb-1 block">event_busy</span>
+                                            No hay datos disponibles para esta fecha
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </article>
+            </div>
         </div>
     );
 }
