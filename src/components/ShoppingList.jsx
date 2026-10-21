@@ -254,14 +254,14 @@ function ShoppingList() {
                     onClick={() => setActiveSubTab('cart')}
                     className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
                         activeSubTab === 'cart'
-                            ? 'bg-primary text-white shadow-md shadow-primary/20'
+                            ? 'bg-white text-black font-bold shadow-md'
                             : 'text-outline hover:text-on-surface'
                     }`}
                 >
                     <span className="material-symbols-outlined text-base">shopping_cart</span>
                     <span>Mi Carrito</span>
                     {items.length > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${activeSubTab === 'cart' ? 'bg-white/20' : 'bg-primary/20 text-primary'}`}>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${activeSubTab === 'cart' ? 'bg-black/20 text-black' : 'bg-white/10 text-white'}`}>
                             {items.length}
                         </span>
                     )}
@@ -272,7 +272,7 @@ function ShoppingList() {
                     onClick={() => setActiveSubTab('finance')}
                     className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
                         activeSubTab === 'finance'
-                            ? 'bg-primary text-white shadow-md shadow-primary/20'
+                            ? 'bg-white text-black font-bold shadow-md'
                             : 'text-outline hover:text-on-surface'
                     }`}
                 >

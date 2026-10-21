@@ -222,21 +222,21 @@ function FinanceReport({ savedLists = [], rate = 1, onGoToCart, onViewReceipt })
                     <button
                         type="button"
                         onClick={() => setPeriodFilter('month')}
-                        className={`px-3 py-1 rounded-full transition-all ${periodFilter === 'month' ? 'bg-primary text-white shadow-sm' : 'text-outline hover:text-on-surface'}`}
+                        className={`px-3 py-1 rounded-full transition-all ${periodFilter === 'month' ? 'bg-white text-black shadow-sm font-bold' : 'text-outline hover:text-on-surface'}`}
                     >
                         Este Mes
                     </button>
                     <button
                         type="button"
                         onClick={() => setPeriodFilter('last30')}
-                        className={`px-3 py-1 rounded-full transition-all ${periodFilter === 'last30' ? 'bg-primary text-white shadow-sm' : 'text-outline hover:text-on-surface'}`}
+                        className={`px-3 py-1 rounded-full transition-all ${periodFilter === 'last30' ? 'bg-white text-black shadow-sm font-bold' : 'text-outline hover:text-on-surface'}`}
                     >
                         30 días
                     </button>
                     <button
                         type="button"
                         onClick={() => setPeriodFilter('all')}
-                        className={`px-3 py-1 rounded-full transition-all ${periodFilter === 'all' ? 'bg-primary text-white shadow-sm' : 'text-outline hover:text-on-surface'}`}
+                        className={`px-3 py-1 rounded-full transition-all ${periodFilter === 'all' ? 'bg-white text-black shadow-sm font-bold' : 'text-outline hover:text-on-surface'}`}
                     >
                         Historial
                     </button>

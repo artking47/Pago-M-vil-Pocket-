@@ -324,10 +324,7 @@ function InstallmentTracker({ onNavigateToCalculator }) {
                                     {/* Purchase Header */}
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-2.5">
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-                                                purchase.platform === 'cashea' ? 'bg-amber-400/20 text-amber-400' :
-                                                purchase.platform === 'krece' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-outline'
-                                            }`}>
+                                            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs bg-white/[0.08] text-white border border-white/10">
                                                 {purchase.platform === 'cashea' ? 'CS' : purchase.platform === 'krece' ? 'KR' : 'BN'}
                                             </div>
                                             <div>
@@ -498,7 +495,7 @@ function InstallmentTracker({ onNavigateToCalculator }) {
                                             type="button"
                                             onClick={() => setPlatform(p)}
                                             className={`py-1.5 rounded-lg capitalize transition-all ${
-                                                platform === p ? 'bg-primary text-white shadow-sm' : 'text-outline hover:text-on-surface'
+                                                platform === p ? 'bg-white text-black font-bold shadow-sm' : 'text-outline hover:text-on-surface'
                                             }`}
                                         >
                                             {p}

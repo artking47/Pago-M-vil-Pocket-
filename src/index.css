@@ -21,13 +21,13 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-apple: cubic-bezier(0.2, 0, 0, 1);
 
-  /* Surface tokens (Apple Aero Dark) */
-  --shell-bg: rgba(255, 255, 255, 0.035);
-  --shell-border: rgba(255, 255, 255, 0.09);
-  --core-bg: linear-gradient(165deg, rgba(30, 34, 52, 0.88) 0%, rgba(18, 20, 34, 0.94) 100%);
-  --core-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
-  --core-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 16px 36px -12px rgba(0, 0, 0, 0.55);
-  --hairline: rgba(255, 255, 255, 0.08);
+  /* Surface tokens (Luxury Noir & Titanium) */
+  --shell-bg: rgba(255, 255, 255, 0.025);
+  --shell-border: rgba(255, 255, 255, 0.07);
+  --core-bg: linear-gradient(180deg, rgba(20, 20, 24, 0.95) 0%, rgba(11, 11, 14, 0.98) 100%);
+  --core-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.03), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.45);
+  --core-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 20px 48px -12px rgba(0, 0, 0, 0.85);
+  --hairline: rgba(255, 255, 255, 0.07);
 }
 
 /* ═══════ GLOBAL RESET ═══════ */
@@ -47,8 +47,8 @@ html {
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  background: #0d0f1c;
-  color: #e0e6f7;
+  background: #09090b;
+  color: #f4f4f5;
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
@@ -58,7 +58,7 @@ body {
   transition: background-color 0.4s ease, color 0.3s ease;
 }
 
-/* Ambient liquid mesh glow: multi-orb atmospheric light for true Aero refraction */
+/* Ambient liquid mesh glow: subtle ethereal obsidian highlight */
 body::before {
   content: '';
   position: fixed;
@@ -66,10 +66,9 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(70% 50% at 12% 0%, rgba(66, 133, 244, 0.22) 0%, transparent 65%),
-    radial-gradient(55% 45% at 95% 15%, rgba(245, 197, 24, 0.12) 0%, transparent 60%),
-    radial-gradient(60% 45% at 50% 85%, rgba(79, 70, 229, 0.14) 0%, transparent 65%),
-    radial-gradient(40% 35% at 5% 55%, rgba(6, 182, 212, 0.08) 0%, transparent 60%);
+    radial-gradient(75% 45% at 50% -5%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+    radial-gradient(40% 30% at 85% 25%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+    radial-gradient(50% 40% at 15% 75%, rgba(255, 255, 255, 0.02) 0%, transparent 55%);
 }
 
 html.light body::before {
@@ -326,20 +325,22 @@ html.light .well {
     0 1px 0 0 rgba(255, 255, 255, 0.8);
 }
 
-/* Raised chip used as the active thumb of segmented controls (Apple iOS style) */
 .thumb-primary {
-  background: linear-gradient(180deg, #5b96f8 0%, #4285F4 50%, #2f74e6 100%);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #ffffff !important;
+  color: #09090b !important;
+  border: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.25),
-    0 4px 14px -3px rgba(66, 133, 244, 0.65);
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.9),
+    0 4px 14px -2px rgba(255, 255, 255, 0.25);
+}
+
+.thumb-primary * {
+  color: #09090b !important;
 }
 
 .thumb-neutral {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
-  color: #e0e6f7;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f4f5;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.25),
@@ -366,24 +367,24 @@ html.light .thumb-neutral {
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #6fa3f8;
-  background: rgba(66, 133, 244, 0.08);
-  border: 1px solid rgba(66, 133, 244, 0.18);
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
+  color: #d4d4d8;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .eyebrow-dot {
   width: 5px;
   height: 5px;
   border-radius: 9999px;
-  background: #F5C518;
-  box-shadow: 0 0 8px rgba(245, 197, 24, 0.7);
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
 }
 
 html.light .eyebrow {
-  color: #1a56c4;
-  background: rgba(66, 133, 244, 0.08);
-  border-color: rgba(66, 133, 244, 0.18);
+  color: #09090b;
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.10);
 }
 
 /* Tactile press feedback (Apple: responsive on pointer-down, spring curve) */
@@ -412,14 +413,14 @@ html.light .eyebrow {
   z-index: 50;
   border-radius: 28px;
   padding: 6px;
-  background: rgba(18, 21, 35, 0.82) !important;
+  background: rgba(12, 12, 15, 0.88) !important;
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.32),
-    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35),
-    0 20px 48px -10px rgba(0, 0, 0, 0.65);
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.5),
+    0 20px 48px -10px rgba(0, 0, 0, 0.85);
 }
 
 html.light .nav-island {
@@ -431,28 +432,29 @@ html.light .nav-island {
 }
 
 .nav-item-active-bg {
-  background: linear-gradient(180deg, rgba(66, 133, 244, 0.22) 0%, rgba(66, 133, 244, 0.10) 100%);
-  border: 1px solid rgba(66, 133, 244, 0.32);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff !important;
   box-shadow:
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.28),
-    0 2px 8px -2px rgba(66, 133, 244, 0.45);
+    0 2px 8px -2px rgba(255, 255, 255, 0.15);
 }
 
 html.light .nav-item-active-bg {
-  background: linear-gradient(180deg, rgba(66, 133, 244, 0.16) 0%, rgba(66, 133, 244, 0.06) 100%);
-  border: 1px solid rgba(66, 133, 244, 0.28);
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   box-shadow:
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.8),
-    0 2px 6px -2px rgba(66, 133, 244, 0.25);
+    0 2px 6px -2px rgba(0, 0, 0, 0.1);
 }
 
 /* Top app bar (Apple Translucent Header) */
 .app-bar {
-  background: rgba(13, 15, 28, 0.65) !important;
+  background: rgba(9, 9, 11, 0.82) !important;
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 24px -6px rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 24px -6px rgba(0, 0, 0, 0.6);
 }
 
 html.light .app-bar {
