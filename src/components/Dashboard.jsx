@@ -9,6 +9,7 @@ const RateHistoryChart = lazy(() => import('./RateHistoryChart'));
 const ShoppingList = lazy(() => import('./ShoppingList'));
 const HomeHub = lazy(() => import('./HomeHub'));
 const FinanceCenter = lazy(() => import('./FinanceCenter'));
+const WelcomeTourModal = lazy(() => import('./WelcomeTourModal'));
 import { getConversionHistory, clearConversionHistory } from './ConversionHistory';
 import { CurrencyFlag } from './FlagIcons';
 
@@ -16,6 +17,13 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
     const { theme } = useTheme();
     const [history, setHistory] = useState(() => getConversionHistory());
     const [activeCalculator, setActiveCalculator] = useState('currency'); // 'currency' | 'paypal' | 'discount'
+    const [showWelcomeTour, setShowWelcomeTour] = useState(() => {
+        try {
+            return localStorage.getItem('pm_pocket_seen_v040_welcome') !== 'true';
+        } catch {
+            return false;
+        }
+    });
 
     React.useEffect(() => {
         if (activeTab === 'profile') {
@@ -445,6 +453,15 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
 
                         <button
                             type="button"
+                            onClick={() => setShowWelcomeTour(true)}
+                            className="w-full mb-3 py-3 px-4 rounded-xl well border border-white/10 text-on-surface font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                        >
+                            <span className="material-symbols-outlined text-base">explore</span>
+                            Ver Novedades & Tour de Inicio (v0.4.0)
+                        </button>
+
+                        <button
+                            type="button"
                             onClick={handleForceUpdateApp}
                             className="w-full mb-8 py-3 px-4 rounded-xl well border border-primary/40 text-primary font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
                         >
@@ -568,6 +585,16 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                     );
                 })}
             </nav>
+
+            {/* WELCOME TOUR MODAL (v0.4.0) */}
+            {showWelcomeTour && (
+                <Suspense fallback={null}>
+                    <WelcomeTourModal 
+                        isOpen={showWelcomeTour}
+                        onClose={() => setShowWelcomeTour(false)}
+                    />
+                </Suspense>
+            )}
         </div>
     );
 }
