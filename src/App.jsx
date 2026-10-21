@@ -26,6 +26,34 @@ function App() {
     useEffect(() => {
         const loadedBanks = getBanks();
         setBanks(loadedBanks);
+
+        // Periodically verify if Netlify deployed a newer version
+        const checkRemoteVersion = async () => {
+            try {
+                const res = await fetch(`/version.json?_t=${Date.now()}`, { cache: 'no-store' });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.version && data.version !== APP_VERSION) {
+                        console.log(`[PWA Update] Detectada nueva versión: ${data.version} (actual: ${APP_VERSION})`);
+                        if ('caches' in window) {
+                            const keys = await caches.keys();
+                            await Promise.all(keys.map(k => caches.delete(k)));
+                        }
+                        if ('serviceWorker' in navigator) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            for (const r of regs) await r.update();
+                        }
+                        window.location.reload(true);
+                    }
+                }
+            } catch (err) {
+                // Offline or network error
+            }
+        };
+
+        checkRemoteVersion();
+        const interval = setInterval(checkRemoteVersion, 30 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     const handleAddBank = (bankData, id = null) => {

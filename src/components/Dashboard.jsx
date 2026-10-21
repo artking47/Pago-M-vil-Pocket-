@@ -112,6 +112,26 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
         reader.readAsText(file);
     };
 
+    const handleForceUpdateApp = async () => {
+        if (window.confirm('¿Deseas buscar e instalar la última versión de la aplicación ahora?')) {
+            try {
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map(k => caches.delete(k)));
+                }
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const r of regs) {
+                        await r.unregister();
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            window.location.reload(true);
+        }
+    };
+
     const logoSrc = theme === 'light' ? '/isotipo-light.png' : '/isotipo-dark.png';
 
     const navItems = [
@@ -135,7 +155,13 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                         </div>
                         <div className="min-w-0">
                             <h1 className="text-on-surface text-[17px] font-bold tracking-[-0.02em] leading-tight truncate">Pago Móvil Pocket</h1>
-                            <p className="text-[10px] text-outline font-semibold tracking-[0.08em] uppercase leading-tight mt-0.5">{appVersion}</p>
+                            <p 
+                                onClick={handleForceUpdateApp} 
+                                className="text-[10px] text-outline hover:text-primary cursor-pointer font-semibold tracking-[0.08em] uppercase leading-tight mt-0.5 active:scale-95 transition-all"
+                                title="Toca para buscar e instalar la última versión"
+                            >
+                                {appVersion} ⟳
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -313,7 +339,7 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                         </div>
 
                         {/* Info Items */}
-                        <div className="space-y-2 mb-8">
+                        <div className="space-y-2 mb-4">
                             {[
                                 { icon: 'verified_user', label: 'Seguridad', desc: 'Datos almacenados localmente en tu dispositivo', color: 'text-primary' },
                                 { icon: 'cloud_off', label: 'Sin servidor', desc: 'No se envían datos a ningún servidor externo', color: 'text-secondary' },
@@ -331,6 +357,15 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                                 </div>
                             ))}
                         </div>
+
+                        <button
+                            type="button"
+                            onClick={handleForceUpdateApp}
+                            className="w-full mb-8 py-3 px-4 rounded-xl well border border-primary/40 text-primary font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                        >
+                            <span className="material-symbols-outlined text-base">sync</span>
+                            Buscar actualización y limpiar caché PWA
+                        </button>
 
                         {/* Backup Section */}
                         <section className="mb-8">

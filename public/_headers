@@ -11,5 +11,15 @@
 /isotipo-*.png
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
 
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/version.json
+  Cache-Control: no-cache, no-store, must-revalidate
+
 /manifest.json
-  Cache-Control: public, max-age=86400
+  Cache-Control: no-cache, no-store, must-revalidate
+
