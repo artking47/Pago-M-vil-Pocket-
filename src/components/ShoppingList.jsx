@@ -5,10 +5,18 @@ import SavedListsModal from './SavedListsModal';
 
 const PriceScanner = lazy(() => import('./PriceScanner'));
 const ReceiptScanner = lazy(() => import('./ReceiptScanner'));
+const FinanceReport = lazy(() => import('./FinanceReport'));
 
 function ShoppingList() {
     const { todayRates } = useRates();
     const rate = todayRates.oficial || 1;
+
+    // View Navigation: 'cart' | 'finance'
+    const [activeSubTab, setActiveSubTab] = useState('cart');
+
+    // Attached receipt data & image from scanner
+    const [attachedReceipt, setAttachedReceipt] = useState(null);
+    const [viewingReceiptPreview, setViewingReceiptPreview] = useState(null);
 
     // Active shopping list items
     const [items, setItems] = useState(() => {
@@ -130,7 +138,7 @@ function ShoppingList() {
     };
 
     // Scanned receipt completion
-    const handleReceiptComplete = ({ receiptImage, receiptData, updatedItems }) => {
+    const handleReceiptComplete = ({ receiptImage, receiptData, updatedItems, receiptTotalUSD, receiptTotalVES }) => {
         // Update active items
         if (updatedItems && updatedItems.length > 0) {
             setItems(updatedItems);
@@ -141,8 +149,16 @@ function ShoppingList() {
             setListTitle(receiptData.supermarketName);
         }
 
+        // Retain attached receipt metadata & photo
+        setAttachedReceipt({
+            receiptImage,
+            receiptData,
+            receiptTotalUSD,
+            receiptTotalVES
+        });
+
         setShowReceiptScanner(false);
-        showToast('Recibo analizado y datos sincronizados');
+        showToast('¡Ticket analizado y artículos sincronizados!');
     };
 
     // Initiate list finalization
@@ -151,7 +167,8 @@ function ShoppingList() {
             alert('Agrega al menos un artículo a tu lista antes de guardarla.');
             return;
         }
-        const defaultTitle = `Compra del ${new Date().toLocaleDateString('es-VE', { day: '2-digit', month: 'short' })}`;
+        const defaultTitle = attachedReceipt?.receiptData?.supermarketName 
+            || `Compra del ${new Date().toLocaleDateString('es-VE', { day: '2-digit', month: 'short' })}`;
         setListTitle(defaultTitle);
         setShowSaveDialog(true);
     };
@@ -164,19 +181,25 @@ function ShoppingList() {
             return;
         }
 
+        const finalUSD = attachedReceipt?.receiptTotalUSD || totalUSD;
+        const finalVES = attachedReceipt?.receiptTotalVES || totalVES;
+
         const newList = {
             id: Date.now(),
-            title: listTitle.trim() || `Compra del ${new Date().toLocaleDateString('es-VE')}`,
+            title: listTitle.trim() || attachedReceipt?.receiptData?.supermarketName || `Compra del ${new Date().toLocaleDateString('es-VE')}`,
             date: new Date().toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-            totalUSD,
-            totalVES,
-            items: [...itemsWithPrices]
+            totalUSD: finalUSD,
+            totalVES: finalVES,
+            items: [...itemsWithPrices],
+            receiptData: attachedReceipt?.receiptData || null,
+            receiptImage: attachedReceipt?.receiptImage || null
         };
 
         setSavedLists(prev => [newList, ...prev]);
         setItems([]);
+        setAttachedReceipt(null);
         setShowSaveDialog(false);
-        showToast('¡Compra guardada con éxito!');
+        showToast('¡Compra guardada con éxito en tu historial financiero!');
     };
 
     // Load a saved list into current shopping cart
@@ -204,24 +227,122 @@ function ShoppingList() {
     return (
         <div className="animate-fade-in-up pb-52">
             {/* Header Section */}
-            <section className="mb-4 pt-2 flex items-center justify-between">
+            <section className="mb-3 pt-2 flex items-center justify-between">
                 <div>
-                    <span className="eyebrow mb-3"><span className="eyebrow-dot" />Compras</span>
-                    <h2 className="text-on-surface text-[28px] font-bold tracking-[-0.03em] leading-[1.1]">Lista de Compras</h2>
-                    <p className="text-on-surface-variant text-sm mt-1">Controla lo que gastas en el súper</p>
+                    <span className="eyebrow mb-2"><span className="eyebrow-dot" />Finanzas & Compras</span>
+                    <h2 className="text-on-surface text-[26px] font-bold tracking-[-0.03em] leading-[1.1]">
+                        {activeSubTab === 'cart' ? 'Lista de Compras' : 'Control Financiero'}
+                    </h2>
+                    <p className="text-on-surface-variant text-xs mt-0.5">
+                        {activeSubTab === 'cart' ? 'Controla lo que gastas en el súper' : 'Métricas, presupuestos y control de facturas'}
+                    </p>
                 </div>
                 <button 
                     type="button"
                     onClick={() => setShowSavedModal(true)}
-                    className="press h-9 px-3.5 rounded-full well text-xs font-bold text-primary flex items-center gap-1.5 shadow-sm"
+                    className="press h-9 px-3.5 rounded-full well text-xs font-bold text-primary flex items-center gap-1.5 shadow-sm shrink-0"
                 >
                     <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-                    Guardadas ({savedLists.length})
+                    Facturas ({savedLists.length})
                 </button>
             </section>
 
-            {/* Input Form Card */}
-            <div className="bezel mb-6">
+            {/* Sub-tab Navigation (Apple Aero Segmented Control) */}
+            <div className="flex p-1 mb-5 rounded-2xl well gap-1 bg-surface-container/60 border border-white/5">
+                <button
+                    type="button"
+                    onClick={() => setActiveSubTab('cart')}
+                    className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                        activeSubTab === 'cart'
+                            ? 'bg-primary text-white shadow-md shadow-primary/20'
+                            : 'text-outline hover:text-on-surface'
+                    }`}
+                >
+                    <span className="material-symbols-outlined text-base">shopping_cart</span>
+                    <span>Mi Carrito</span>
+                    {items.length > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${activeSubTab === 'cart' ? 'bg-white/20' : 'bg-primary/20 text-primary'}`}>
+                            {items.length}
+                        </span>
+                    )}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActiveSubTab('finance')}
+                    className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                        activeSubTab === 'finance'
+                            ? 'bg-primary text-white shadow-md shadow-primary/20'
+                            : 'text-outline hover:text-on-surface'
+                    }`}
+                >
+                    <span className="material-symbols-outlined text-base">insights</span>
+                    <span>Control Financiero</span>
+                </button>
+            </div>
+
+            {/* TAB 1: FINANCIAL REPORTS & CONTROL */}
+            {activeSubTab === 'finance' ? (
+                <Suspense fallback={
+                    <div className="card-glass p-12 text-center text-outline my-6">
+                        <span className="material-symbols-outlined text-3xl animate-spin mb-2 block text-primary">hourglass_empty</span>
+                        <p className="text-xs font-bold">Cargando reporte financiero...</p>
+                    </div>
+                }>
+                    <FinanceReport 
+                        savedLists={savedLists}
+                        rate={rate}
+                        onGoToCart={() => setActiveSubTab('cart')}
+                        onViewReceipt={(img) => setViewingReceiptPreview(img)}
+                    />
+                </Suspense>
+            ) : (
+                /* TAB 2: ACTIVE SHOPPING CART */
+                <div>
+                    {/* Attached Receipt Notification Banner */}
+                    {attachedReceipt && (
+                        <div className="card-glass border-secondary/40 bg-secondary/10 p-3.5 rounded-2xl flex items-center justify-between mb-4 animate-slide-down">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-9 h-9 rounded-full bg-secondary/20 text-secondary flex items-center justify-center shrink-0">
+                                    <span className="material-symbols-outlined text-lg">receipt_long</span>
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-on-surface font-bold text-xs truncate">
+                                        Ticket vinculado: <span className="text-secondary">{attachedReceipt.receiptData?.supermarketName || 'Supermercado'}</span>
+                                    </p>
+                                    <p className="text-outline text-[11px] truncate mt-0.5">
+                                        {attachedReceipt.receiptData?.items?.length || 0} artículos sincronizados
+                                        {attachedReceipt.receiptData?.rate ? ` • Tasa Bs. ${attachedReceipt.receiptData.rate.toFixed(2)}` : ''}
+                                        {attachedReceipt.receiptData?.igtfVES ? ` • IGTF Bs. ${attachedReceipt.receiptData.igtfVES.toFixed(2)}` : ''}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                {attachedReceipt.receiptImage && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewingReceiptPreview(attachedReceipt.receiptImage)}
+                                        className="h-8 px-2.5 rounded-full well text-xs font-bold text-primary flex items-center gap-1 active:scale-95"
+                                        title="Ver foto del ticket"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">visibility</span>
+                                        Ver
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setAttachedReceipt(null)}
+                                    className="w-8 h-8 rounded-full well text-outline hover:text-error flex items-center justify-center active:scale-95"
+                                    title="Desvincular ticket"
+                                >
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Input Form Card */}
+                    <div className="bezel mb-6">
                 <form onSubmit={handleAddItem} className="bezel-core card-sheen p-4 sm:p-5 space-y-3">
                     <div className="flex gap-2.5">
                         <div className="flex-[3]">
@@ -468,36 +589,62 @@ function ShoppingList() {
                     </p>
                 </div>
             )}
+        </div>
+    )}
 
-            {/* FLOATING TOTAL BAR */}
-            <div className="fixed bottom-[84px] left-3 right-3 z-40 pointer-events-none">
-                <div className="max-w-md mx-auto">
-                    <div className="glass-aero card-sheen rounded-[24px] p-3.5 px-4 flex items-center justify-between pointer-events-auto shadow-2xl border border-white/10">
-                        <div className="min-w-0 pr-2">
-                            <p className="text-[10px] text-outline uppercase font-bold tracking-[0.14em] mb-0.5">Total Estimado</p>
-                            <p className="text-on-surface font-bold text-sm">
-                                Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                            <p className="text-primary text-[26px] font-bold tracking-tight leading-none">
-                                ${totalUSD.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                            {items.length > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={handleOpenSaveDialog}
-                                    className="press h-9 px-3 rounded-full thumb-primary text-white font-bold text-xs flex items-center gap-1 shadow-md"
-                                    title="Guardar lista de compra"
-                                >
-                                    <span className="material-symbols-outlined text-[14px]">save</span>
-                                    Guardar
-                                </button>
-                            )}
+            {/* FLOATING TOTAL BAR (Visible only in active cart) */}
+            {activeSubTab === 'cart' && (
+                <div className="fixed bottom-[84px] left-3 right-3 z-40 pointer-events-none">
+                    <div className="max-w-md mx-auto">
+                        <div className="glass-aero card-sheen rounded-[24px] p-3.5 px-4 flex items-center justify-between pointer-events-auto shadow-2xl border border-white/10">
+                            <div className="min-w-0 pr-2">
+                                <p className="text-[10px] text-outline uppercase font-bold tracking-[0.14em] mb-0.5">Total Estimado</p>
+                                <p className="text-on-surface font-bold text-sm">
+                                    Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                                <p className="text-primary text-[26px] font-bold tracking-tight leading-none">
+                                    ${totalUSD.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                                {items.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenSaveDialog}
+                                        className="press h-9 px-3 rounded-full thumb-primary text-white font-bold text-xs flex items-center gap-1 shadow-md"
+                                        title="Guardar lista de compra"
+                                    >
+                                        <span className="material-symbols-outlined text-[14px]">save</span>
+                                        Guardar
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {/* FULLSCREEN RECEIPT PREVIEW MODAL */}
+            {viewingReceiptPreview && (
+                <div 
+                    className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-overlay"
+                    onClick={() => setViewingReceiptPreview(null)}
+                >
+                    <button 
+                        onClick={() => setViewingReceiptPreview(null)}
+                        className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center active:scale-95 transition-all"
+                        aria-label="Cerrar imagen"
+                    >
+                        <span className="material-symbols-outlined text-xl">close</span>
+                    </button>
+                    <img 
+                        src={viewingReceiptPreview} 
+                        alt="Ticket de compra escaneado" 
+                        className="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border border-white/10" 
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
 
             {/* MODAL 1: PRICE SCANNER */}
             {showScanner && (

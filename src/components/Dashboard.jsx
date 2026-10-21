@@ -137,7 +137,7 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
     const navItems = [
         { id: 'calculator', icon: 'calculate', label: 'Calculadora', fill: true },
         { id: 'rates', icon: 'show_chart', label: 'Tasas', fill: false },
-        { id: 'shopping', icon: 'shopping_cart', label: 'Compras', fill: false },
+        { id: 'shopping', icon: 'receipt_long', label: 'Finanzas', fill: false },
         { id: 'accounts', icon: 'account_balance_wallet', label: 'Cuentas', fill: false },
         { id: 'profile', icon: 'person', label: 'Perfil', fill: false },
     ];

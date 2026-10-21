@@ -10,7 +10,16 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
     const [parsedData, setParsedData] = useState(null);
     const [errorMessage, setErrorMessage] = useState(null);
 
-    // Selected items from receipt to add to shopping list
+    // Editable fields for precision correction
+    const [storeName, setStoreName] = useState('');
+    const [totalVES, setTotalVES] = useState('');
+    const [totalUSD, setTotalUSD] = useState('');
+    const [bcvRate, setBcvRate] = useState('');
+    const [igtfVES, setIgtfVES] = useState('');
+    const [ivaVES, setIvaVES] = useState('');
+    const [editableItems, setEditableItems] = useState([]);
+
+    // Selection of items to add or update
     const [selectedNewItems, setSelectedNewItems] = useState({});
     const [selectedPriceUpdates, setSelectedPriceUpdates] = useState({});
 
@@ -34,10 +43,10 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
 
         try {
             // Compress image for preview and local storage
-            const compressed = await compressImageForStorage(file, 1000, 0.72);
+            const compressed = await compressImageForStorage(file, 1100, 0.75);
             setImagePreview(compressed);
 
-            setStatus('Analizando ticket y extrayendo datos...');
+            setStatus('Analizando ticket y extrayendo artículos...');
             const img = new Image();
             img.src = compressed;
             await new Promise((res, rej) => {
@@ -52,97 +61,167 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                 }
             });
 
-            // Reconcile with current items
-            // 1. Identify which receipt items match existing items by name similarity
-            const priceUpdates = {};
-            const newItems = {};
+            // Populate editable fields
+            setStoreName(result.supermarketName || 'Supermercado');
+            setTotalVES(result.totalVES ? result.totalVES.toString() : '');
+            setTotalUSD(result.totalUSD ? result.totalUSD.toString() : '');
+            setBcvRate(result.rate ? result.rate.toString() : (rate ? rate.toString() : ''));
+            setIgtfVES(result.igtfVES ? result.igtfVES.toString() : '');
+            setIvaVES(result.ivaVES ? result.ivaVES.toString() : '');
+            setEditableItems(result.items || []);
 
-            result.items.forEach((rItem) => {
-                const match = currentItems.find(cItem => {
-                    const cName = cItem.name.toLowerCase().trim();
-                    const rName = rItem.name.toLowerCase().trim();
-                    return cName.includes(rName) || rName.includes(cName);
-                });
+            // Reconcile with active shopping list
+            reconcileWithCart(result.items || []);
 
-                if (match) {
-                    // Match found: check if price differs
-                    priceUpdates[match.id] = {
-                        original: match,
-                        newPrice: rItem.price,
-                        formattedPrice: rItem.formattedPrice,
-                        receiptName: rItem.name
-                    };
-                } else {
-                    // New item not in shopping list
-                    newItems[rItem.id] = {
-                        ...rItem,
-                        selected: true
-                    };
-                }
-            });
-
-            setSelectedPriceUpdates(priceUpdates);
-            setSelectedNewItems(newItems);
             setParsedData(result);
-            setStatus('¡Recibo analizado con éxito!');
+            setStatus('¡Ticket analizado con éxito!');
         } catch (err) {
             console.error('Receipt OCR error:', err);
-            setErrorMessage('No pudimos procesar la imagen del recibo. Asegúrate de que esté bien iluminada y nítida.');
+            setErrorMessage('No pudimos procesar la imagen del recibo. Asegúrate de enfocar bien y con buena luz.');
         } finally {
             setProcessing(false);
         }
     };
 
-    // Calculate current estimated total of shopping list
+    // Reconcile detected items with current shopping cart
+    const reconcileWithCart = (itemsList) => {
+        const priceUpdates = {};
+        const newItems = {};
+
+        itemsList.forEach((rItem) => {
+            const match = currentItems.find(cItem => {
+                const cName = cItem.name.toLowerCase().trim();
+                const rName = rItem.name.toLowerCase().trim();
+                return cName.includes(rName) || rName.includes(cName);
+            });
+
+            if (match) {
+                priceUpdates[match.id] = {
+                    original: match,
+                    newPrice: rItem.price,
+                    formattedPrice: rItem.formattedPrice,
+                    receiptName: rItem.name,
+                    apply: true
+                };
+            } else {
+                newItems[rItem.id] = {
+                    ...rItem,
+                    selected: true
+                };
+            }
+        });
+
+        setSelectedPriceUpdates(priceUpdates);
+        setSelectedNewItems(newItems);
+    };
+
+    // Add manual item
+    const handleAddManualItem = () => {
+        const newItem = {
+            id: `manual-item-${Date.now()}`,
+            name: 'NUEVO ARTÍCULO',
+            quantity: 1,
+            price: 0,
+            formattedPrice: '0,00'
+        };
+        const updated = [...editableItems, newItem];
+        setEditableItems(updated);
+        setSelectedNewItems(prev => ({
+            ...prev,
+            [newItem.id]: { ...newItem, selected: true }
+        }));
+    };
+
+    // Delete item from detected list
+    const handleDeleteItem = (itemId) => {
+        setEditableItems(prev => prev.filter(it => it.id !== itemId));
+        setSelectedNewItems(prev => {
+            const copy = { ...prev };
+            delete copy[itemId];
+            return copy;
+        });
+    };
+
+    // Update item field (name, quantity, price)
+    const handleItemFieldChange = (itemId, field, val) => {
+        setEditableItems(prev => prev.map(it => {
+            if (it.id === itemId) {
+                const updated = { ...it, [field]: val };
+                if (field === 'price') {
+                    const parsed = parseFloat(String(val).replace(',', '.')) || 0;
+                    updated.price = parsed;
+                    updated.formattedPrice = parsed.toFixed(2);
+                }
+                return updated;
+            }
+            return it;
+        }));
+    };
+
+    // Current total of shopping list
     const currentTotalUSD = currentItems.reduce((acc, it) => {
         const qty = it.quantity || 1;
         const p = it.originalCurrency === 'USD' ? it.originalPrice : (it.originalPrice / (rate || 1));
         return acc + (p * qty);
     }, 0);
 
-    const receiptTotalUSD = parsedData?.totalUSD || (parsedData?.totalVES && rate ? parsedData.totalVES / rate : null);
-    const diffUSD = (receiptTotalUSD && currentTotalUSD > 0) ? (receiptTotalUSD - currentTotalUSD) : null;
+    const parsedRateNum = parseFloat(bcvRate) || rate || 1;
+    const finalTotalUSD = totalUSD ? parseFloat(totalUSD) : (totalVES ? parseFloat(totalVES) / parsedRateNum : null);
+    const diffUSD = (finalTotalUSD && currentTotalUSD > 0) ? (finalTotalUSD - currentTotalUSD) : null;
 
     // Apply reconciliation and finish
     const handleApplyAndFinish = () => {
-        // Build updated list
         let updatedItems = [...currentItems];
 
-        // 1. Apply price updates from receipt
+        // 1. Update prices for matched items
         Object.entries(selectedPriceUpdates).forEach(([itemId, data]) => {
-            updatedItems = updatedItems.map(item => {
-                if (item.id === parseInt(itemId, 10) || item.id === itemId) {
-                    return {
-                        ...item,
-                        originalPrice: data.newPrice,
-                        originalCurrency: parsedData?.rate ? 'VES' : item.originalCurrency
-                    };
-                }
-                return item;
-            });
+            if (data.apply) {
+                updatedItems = updatedItems.map(item => {
+                    if (item.id === parseInt(itemId, 10) || item.id === itemId) {
+                        return {
+                            ...item,
+                            originalPrice: data.newPrice,
+                            originalCurrency: bcvRate ? 'VES' : item.originalCurrency
+                        };
+                    }
+                    return item;
+                });
+            }
         });
 
-        // 2. Append new items selected from receipt
+        // 2. Add missing/untracked items detected in receipt
         Object.values(selectedNewItems).forEach(rItem => {
             if (rItem.selected) {
-                // Determine currency
-                const isVES = parsedData?.totalVES && !parsedData?.totalUSD;
+                const currentEdit = editableItems.find(it => it.id === rItem.id) || rItem;
+                const isVES = totalVES && !totalUSD;
                 updatedItems.push({
                     id: Date.now() + Math.random(),
-                    name: rItem.name,
-                    quantity: rItem.quantity || 1,
-                    originalPrice: rItem.price,
+                    name: currentEdit.name || 'PRODUCTO',
+                    quantity: currentEdit.quantity || 1,
+                    originalPrice: currentEdit.price || 0,
                     originalCurrency: isVES ? 'VES' : 'USD'
                 });
             }
         });
 
+        const compiledReceiptData = {
+            supermarketName: storeName || 'Supermercado',
+            invoiceNumber: parsedData?.invoiceNumber || '',
+            invoiceDate: parsedData?.invoiceDate || new Date().toLocaleDateString('es-VE'),
+            rate: parsedRateNum,
+            totalVES: parseFloat(totalVES) || (finalTotalUSD ? finalTotalUSD * parsedRateNum : 0),
+            totalUSD: finalTotalUSD || 0,
+            ivaVES: parseFloat(ivaVES) || 0,
+            igtfVES: parseFloat(igtfVES) || 0,
+            items: editableItems
+        };
+
         onComplete({
             receiptImage: imagePreview,
-            receiptData: parsedData,
+            receiptData: compiledReceiptData,
             updatedItems,
-            receiptTotalUSD,
-            receiptTotalVES: parsedData?.totalVES
+            receiptTotalUSD: finalTotalUSD,
+            receiptTotalVES: compiledReceiptData.totalVES
         });
     };
 
@@ -151,7 +230,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="receipt-scanner-title"
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col justify-between overflow-hidden animate-overlay"
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col justify-between overflow-hidden animate-overlay"
         >
             {/* TOP BAR */}
             <div 
@@ -170,7 +249,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
 
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary">receipt_long</span>
-                    <h3 id="receipt-scanner-title" className="text-on-surface font-bold text-sm">Escáner de Recibo</h3>
+                    <h3 id="receipt-scanner-title" className="text-on-surface font-bold text-sm">Escáner & Análisis de Ticket</h3>
                 </div>
 
                 <button 
@@ -184,7 +263,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
             </div>
 
             {/* MAIN CONTENT AREA */}
-            <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full space-y-4 pb-28">
+            <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full space-y-4 pb-32">
                 {/* Intro / Instructions Card */}
                 {!parsedData && !processing && (
                     <div className="card-glass p-6 text-center space-y-4 animate-fade-in-up">
@@ -194,7 +273,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                         <div>
                             <h4 className="text-on-surface font-bold text-lg">Escanea tu Ticket de Compra</h4>
                             <p className="text-outline text-xs mt-1 leading-relaxed">
-                                Toma una foto nítida de la factura fiscal para que la IA extraiga los totales, impuestos (IVA/IGTF), la tasa del comercio y agregue artículos que olvidaste anotar.
+                                Toma una foto nítida de la factura fiscal. La IA extraerá los artículos, impuestos (IVA / IGTF 3%), tasa BCV y te permitirá corregir cualquier detalle antes de agregar los productos faltantes a tu lista.
                             </p>
                         </div>
 
@@ -206,7 +285,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                 className="h-13 py-3.5 px-4 rounded-[20px] thumb-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/25 active:scale-95 transition-all"
                             >
                                 <span className="material-symbols-outlined text-xl">photo_camera</span>
-                                Tomar foto del recibo
+                                Tomar foto del recibo (Cámara)
                             </button>
 
                             <button
@@ -229,7 +308,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                         </div>
                         <div>
                             <h4 className="text-on-surface font-bold text-base">{status}</h4>
-                            <p className="text-outline text-xs mt-1">Identificando artículos, precios y totales...</p>
+                            <p className="text-outline text-xs mt-1">Leyendo líneas térmicas, precios y tasas...</p>
                         </div>
                         {progress > 0 && (
                             <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden mt-3">
@@ -252,7 +331,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                     <div className="bg-error/15 border border-error/30 p-4 rounded-2xl flex items-start gap-3 text-left">
                         <span className="material-symbols-outlined text-error text-xl shrink-0">error</span>
                         <div className="flex-1 text-xs">
-                            <p className="font-bold text-on-surface mb-1">Error al leer la factura</p>
+                            <p className="font-bold text-on-surface mb-1">Error al procesar el ticket</p>
                             <p className="text-outline">{errorMessage}</p>
                             <button
                                 type="button"
@@ -275,31 +354,28 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                     onChange={handleFileSelected} 
                 />
 
-                {/* PARSED RECEIPT RESULTS & RECONCILIATION */}
+                {/* PARSED RECEIPT RESULTS & INTERACTIVE REVIEW EDITOR */}
                 {parsedData && !processing && (
                     <div className="space-y-4 animate-fade-in-up">
-                        {/* Receipt Header & Financial Insights Card */}
+                        {/* Summary & Financial Card */}
                         <div className="bezel">
                             <div className="bezel-core card-sheen p-4 space-y-3">
                                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <div className="w-9 h-9 rounded-xl bg-secondary/20 text-secondary flex items-center justify-center shrink-0">
-                                            <span className="material-symbols-outlined text-base">storefront</span>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="text-on-surface font-bold text-sm truncate">{parsedData.supermarketName}</h4>
-                                            <p className="text-outline text-[11px]">
-                                                {parsedData.invoiceDate} {parsedData.invoiceNumber && `• Doc: ${parsedData.invoiceNumber}`}
-                                            </p>
-                                        </div>
+                                    <div className="flex-1 mr-2">
+                                        <label className="text-[10px] font-bold text-outline uppercase tracking-wider block mb-0.5">Comercio / Supermercado</label>
+                                        <input 
+                                            type="text" 
+                                            value={storeName}
+                                            onChange={(e) => setStoreName(e.target.value)}
+                                            className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none text-on-surface font-bold text-sm"
+                                        />
                                     </div>
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="text-primary text-xs font-bold flex items-center gap-1"
-                                        title="Cambiar foto de recibo"
+                                        className="text-primary text-xs font-bold flex items-center gap-1 shrink-0"
                                     >
-                                        <span className="material-symbols-outlined text-sm">cached</span> Cambiar
+                                        <span className="material-symbols-outlined text-sm">cached</span> Cambiar foto
                                     </button>
                                 </div>
 
@@ -313,11 +389,16 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                     </div>
                                     <div className="well p-3 rounded-2xl border-primary/30">
                                         <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Total en Ticket</p>
-                                        <p className="text-primary font-bold text-lg mt-0.5">
-                                            {receiptTotalUSD 
-                                                ? `$${receiptTotalUSD.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                                : (parsedData.totalVES ? `Bs. ${parsedData.totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2 })}` : 'No detectado')}
-                                        </p>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-primary font-bold text-lg">$</span>
+                                            <input 
+                                                type="number"
+                                                step="0.01"
+                                                value={finalTotalUSD || ''}
+                                                onChange={(e) => setTotalUSD(e.target.value)}
+                                                className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none text-primary font-bold text-lg"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -335,94 +416,182 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                     </div>
                                 )}
 
-                                {/* Specific Venezuelan Fiscal Data Insights */}
-                                <div className="pt-2 border-t border-white/5 space-y-1.5 text-xs">
-                                    <p className="text-[10px] font-bold text-outline uppercase tracking-[0.14em] mb-1">Datos fiscales del ticket</p>
+                                {/* Financial Details & Tax Breakdown */}
+                                <div className="pt-2 border-t border-white/5 space-y-2 text-xs">
+                                    <p className="text-[10px] font-bold text-outline uppercase tracking-[0.14em]">Datos Fiscales del Ticket</p>
                                     
-                                    {parsedData.rate && (
-                                        <div className="flex justify-between text-on-surface-variant">
-                                            <span>Tasa BCV del ticket:</span>
-                                            <span className="font-bold text-on-surface">Bs. {parsedData.rate.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="text-[10px] text-outline">Tasa BCV del ticket (Bs):</label>
+                                            <input 
+                                                type="number"
+                                                step="0.01"
+                                                value={bcvRate}
+                                                onChange={(e) => setBcvRate(e.target.value)}
+                                                placeholder="0.00"
+                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none"
+                                            />
                                         </div>
-                                    )}
-                                    {parsedData.totalVES && (
-                                        <div className="flex justify-between text-on-surface-variant">
-                                            <span>Monto total en Bolívares:</span>
-                                            <span className="font-bold text-on-surface">Bs. {parsedData.totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                                        <div>
+                                            <label className="text-[10px] text-tertiary font-bold">IGTF 3% (Divisas Bs):</label>
+                                            <input 
+                                                type="number"
+                                                step="0.01"
+                                                value={igtfVES}
+                                                onChange={(e) => setIgtfVES(e.target.value)}
+                                                placeholder="0.00"
+                                                className="w-full well rounded-xl px-2.5 py-1.5 text-tertiary font-bold text-xs mt-0.5 outline-none"
+                                            />
                                         </div>
-                                    )}
-                                    {parsedData.igtfVES && (
-                                        <div className="flex justify-between text-tertiary">
-                                            <span className="flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[13px]">payments</span>
-                                                IGTF (3% divisas pagado):
-                                            </span>
-                                            <span className="font-bold">Bs. {parsedData.igtfVES.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="text-[10px] text-outline">IVA 16% (Bs):</label>
+                                            <input 
+                                                type="number"
+                                                step="0.01"
+                                                value={ivaVES}
+                                                onChange={(e) => setIvaVES(e.target.value)}
+                                                placeholder="0.00"
+                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none"
+                                            />
                                         </div>
-                                    )}
-                                    {parsedData.ivaVES && (
-                                        <div className="flex justify-between text-on-surface-variant">
-                                            <span>IVA (16%):</span>
-                                            <span className="font-bold text-on-surface">Bs. {parsedData.ivaVES.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                                        <div>
+                                            <label className="text-[10px] text-outline">Total Ticket (Bs):</label>
+                                            <input 
+                                                type="number"
+                                                step="0.01"
+                                                value={totalVES}
+                                                onChange={(e) => setTotalVES(e.target.value)}
+                                                placeholder="0.00"
+                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none"
+                                            />
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Missing / New Items Detected in Receipt */}
-                        {Object.keys(selectedNewItems).length > 0 && (
-                            <div className="card-glass p-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-on-surface font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                                            <span className="material-symbols-outlined text-primary text-base">add_shopping_cart</span>
-                                            Artículos detectados en ticket ({Object.keys(selectedNewItems).length})
-                                        </p>
-                                        <p className="text-outline text-[11px]">Marca los que deseas añadir a tu lista:</p>
-                                    </div>
-                                    <button 
-                                        type="button"
-                                        onClick={() => {
-                                            const allChecked = Object.values(selectedNewItems).every(i => i.selected);
-                                            const updated = {};
-                                            Object.entries(selectedNewItems).forEach(([k, v]) => {
-                                                updated[k] = { ...v, selected: !allChecked };
-                                            });
-                                            setSelectedNewItems(updated);
-                                        }}
-                                        className="text-xs text-primary font-bold hover:underline"
-                                    >
-                                        {Object.values(selectedNewItems).every(i => i.selected) ? 'Desmarcar todos' : 'Marcar todos'}
-                                    </button>
+                        {/* DETECTED ITEMS EDITABLE TABLE */}
+                        <div className="card-glass p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-on-surface font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-primary text-base">format_list_bulleted</span>
+                                        Artículos Detectados ({editableItems.length})
+                                    </p>
+                                    <p className="text-outline text-[11px]">Toca cualquier nombre o precio para corregir imprecisiones</p>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddManualItem}
+                                    className="text-xs text-primary font-bold flex items-center gap-1 hover:underline"
+                                >
+                                    <span className="material-symbols-outlined text-sm">add</span> Añadir
+                                </button>
+                            </div>
 
-                                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                                    {Object.entries(selectedNewItems).map(([id, item]) => (
-                                        <label 
-                                            key={id}
-                                            className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${item.selected ? 'bg-primary/10 border-primary/40 text-on-surface' : 'well border-transparent text-outline'}`}
+                            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {editableItems.map((item) => {
+                                    const isNew = selectedNewItems[item.id];
+                                    return (
+                                        <div 
+                                            key={item.id}
+                                            className={`p-2.5 rounded-xl border flex items-center gap-2 ${isNew?.selected ? 'bg-primary/10 border-primary/30' : 'well border-transparent'}`}
                                         >
-                                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                            {/* Checkbox to add to cart if it was missing */}
+                                            {isNew && (
                                                 <input 
                                                     type="checkbox"
-                                                    checked={!!item.selected}
+                                                    checked={!!isNew.selected}
                                                     onChange={(e) => {
                                                         setSelectedNewItems(prev => ({
                                                             ...prev,
-                                                            [id]: { ...prev[id], selected: e.target.checked }
+                                                            [item.id]: { ...prev[item.id], selected: e.target.checked }
                                                         }));
                                                     }}
-                                                    className="w-4 h-4 rounded text-primary focus:ring-0 bg-transparent border-white/20"
+                                                    title="Marcar para agregar al carrito"
+                                                    className="w-4 h-4 rounded text-primary focus:ring-0 bg-transparent border-white/20 shrink-0"
                                                 />
-                                                <span className="text-xs font-semibold truncate">{item.name}</span>
+                                            )}
+
+                                            {/* Name Input */}
+                                            <div className="flex-1 min-w-0">
+                                                <input 
+                                                    type="text"
+                                                    value={item.name}
+                                                    onChange={(e) => handleItemFieldChange(item.id, 'name', e.target.value)}
+                                                    className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none text-on-surface font-semibold text-xs truncate"
+                                                />
+                                                <div className="flex items-center gap-1.5 text-[10px] text-outline mt-0.5">
+                                                    <span>Cant:</span>
+                                                    <input 
+                                                        type="number"
+                                                        min="1"
+                                                        value={item.quantity || 1}
+                                                        onChange={(e) => handleItemFieldChange(item.id, 'quantity', parseInt(e.target.value, 10) || 1)}
+                                                        className="w-8 bg-white/10 rounded px-1 py-0.5 text-center text-on-surface font-bold outline-none"
+                                                    />
+                                                    {isNew && (
+                                                        <span className="text-secondary font-bold ml-1">• No estaba en lista</span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <span className="font-bold text-xs shrink-0 text-primary">
-                                                {item.formattedPrice}
-                                            </span>
-                                        </label>
-                                    ))}
+
+                                            {/* Price Input */}
+                                            <div className="w-20 text-right shrink-0">
+                                                <input 
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={item.price || ''}
+                                                    onChange={(e) => handleItemFieldChange(item.id, 'price', e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="w-full bg-white/10 rounded-lg px-2 py-1 text-right text-primary font-bold text-xs outline-none"
+                                                />
+                                            </div>
+
+                                            {/* Delete Item */}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDeleteItem(item.id)}
+                                                className="w-7 h-7 rounded-full well flex items-center justify-center text-outline hover:text-error shrink-0"
+                                                title="Eliminar este artículo"
+                                            >
+                                                <span className="material-symbols-outlined text-xs">close</span>
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* RECONCILIATION SUMMARY BOX: Artículos que se pasaron añadir */}
+                        {Object.keys(selectedNewItems).length > 0 && (
+                            <div className="card-glass p-3.5 rounded-2xl border border-secondary/30 bg-secondary/5 flex items-center justify-between">
+                                <div className="min-w-0 pr-2">
+                                    <p className="text-secondary font-bold text-xs flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">playlist_add</span>
+                                        {Object.values(selectedNewItems).filter(i => i.selected).length} artículos faltantes seleccionados
+                                    </p>
+                                    <p className="text-outline text-[11px] mt-0.5">
+                                        Se agregarán automáticamente a tu carrito activo al finalizar.
+                                    </p>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const allSelected = Object.values(selectedNewItems).every(i => i.selected);
+                                        const updated = {};
+                                        Object.entries(selectedNewItems).forEach(([k, v]) => {
+                                            updated[k] = { ...v, selected: !allSelected };
+                                        });
+                                        setSelectedNewItems(updated);
+                                    }}
+                                    className="text-xs text-secondary font-bold underline shrink-0"
+                                >
+                                    {Object.values(selectedNewItems).every(i => i.selected) ? 'Desmarcar' : 'Marcar todos'}
+                                </button>
                             </div>
                         )}
                     </div>
@@ -448,7 +617,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                         className="h-12 px-5 rounded-[16px] thumb-primary text-white font-bold text-sm flex-[2] flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-primary/25"
                     >
                         <span className="material-symbols-outlined text-lg">check_circle</span>
-                        Aplicar y Guardar Recibo
+                        Aplicar y Sincronizar Carrito
                     </button>
                 </div>
             )}
