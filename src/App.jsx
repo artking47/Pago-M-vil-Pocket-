@@ -21,7 +21,7 @@ function App() {
         return false;
     });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
-    const [activeTab, setActiveTab] = useState('calculator');
+    const [activeTab, setActiveTab] = useState('home');
 
     useEffect(() => {
         const loadedBanks = getBanks();

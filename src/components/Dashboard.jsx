@@ -7,6 +7,9 @@ import PaypalCalculator from './PaypalCalculator';
 import DiscountCalculator from './DiscountCalculator';
 const RateHistoryChart = lazy(() => import('./RateHistoryChart'));
 const ShoppingList = lazy(() => import('./ShoppingList'));
+const HomeHub = lazy(() => import('./HomeHub'));
+const InstallmentTracker = lazy(() => import('./InstallmentTracker'));
+const SalaryPurchasingPower = lazy(() => import('./SalaryPurchasingPower'));
 import { getConversionHistory, clearConversionHistory } from './ConversionHistory';
 import { CurrencyFlag } from './FlagIcons';
 
@@ -32,6 +35,8 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
             const historyData = localStorage.getItem('pm_pocket_conversion_history') || '[]';
             const shoppingItems = localStorage.getItem('shoppingListItems') || '[]';
             const shoppingSaved = localStorage.getItem('shoppingSavedLists') || '[]';
+            const installments = localStorage.getItem('pm_pocket_installments') || '[]';
+            const salaryEntries = localStorage.getItem('pm_pocket_salary_entries') || '[]';
             
             const backup = {
                 version: appVersion,
@@ -39,7 +44,9 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 banks: JSON.parse(banksData),
                 history: JSON.parse(historyData),
                 shoppingItems: JSON.parse(shoppingItems),
-                shoppingSavedLists: JSON.parse(shoppingSaved)
+                shoppingSavedLists: JSON.parse(shoppingSaved),
+                installments: JSON.parse(installments),
+                salaryEntries: JSON.parse(salaryEntries)
             };
 
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -100,6 +107,16 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 if (Array.isArray(data.shoppingSavedLists)) {
                     localStorage.setItem('shoppingSavedLists', JSON.stringify(data.shoppingSavedLists));
                 }
+
+                // Validate installments
+                if (Array.isArray(data.installments)) {
+                    localStorage.setItem('pm_pocket_installments', JSON.stringify(data.installments));
+                }
+
+                // Validate salary entries
+                if (Array.isArray(data.salaryEntries)) {
+                    localStorage.setItem('pm_pocket_salary_entries', JSON.stringify(data.salaryEntries));
+                }
                 
                 alert('¡Datos restaurados con éxito! La aplicación se recargará.');
                 window.location.reload();
@@ -135,11 +152,11 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
     const logoSrc = theme === 'light' ? '/isotipo-light.png' : '/isotipo-dark.png';
 
     const navItems = [
+        { id: 'home', icon: 'dashboard', label: 'Inicio', fill: true },
         { id: 'calculator', icon: 'calculate', label: 'Calculadora', fill: true },
-        { id: 'rates', icon: 'show_chart', label: 'Tasas', fill: false },
+        { id: 'cuotas', icon: 'calendar_month', label: 'Cuotas', fill: false },
         { id: 'shopping', icon: 'receipt_long', label: 'Finanzas', fill: false },
         { id: 'accounts', icon: 'account_balance_wallet', label: 'Cuentas', fill: false },
-        { id: 'profile', icon: 'person', label: 'Perfil', fill: false },
     ];
 
     return (
@@ -166,6 +183,24 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
+                        <button
+                            type="button"
+                            onClick={() => onTabChange(activeTab === 'profile' ? 'home' : 'profile')}
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                                activeTab === 'profile' 
+                                    ? 'bg-primary text-black shadow-md' 
+                                    : 'well text-outline hover:text-on-surface'
+                            }`}
+                            title="Mi Perfil y Respaldo"
+                            aria-label="Perfil"
+                        >
+                            <span 
+                                className="material-symbols-outlined text-[19px]" 
+                                style={activeTab === 'profile' ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                            >
+                                person
+                            </span>
+                        </button>
                     </div>
                 </div>
             </header>
@@ -174,6 +209,62 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
             <div className="h-16 w-full"></div>
 
             <main className="px-margin-safe py-lg space-y-lg pb-32 max-w-3xl mx-auto">
+                {/* ═══════ HOME HUB TAB (COMMAND CENTER) ═══════ */}
+                {activeTab === 'home' && (
+                    <Suspense fallback={
+                        <div className="glass-surface rounded-2xl p-md h-64 flex items-center justify-center">
+                            <div className="text-center text-outline">
+                                <span className="material-symbols-outlined text-3xl animate-pulse mb-2 block">dashboard</span>
+                                <p className="text-sm">Cargando inicio...</p>
+                            </div>
+                        </div>
+                    }>
+                        <HomeHub 
+                            onNavigateTab={onTabChange}
+                            onOpenReceiptScanner={() => onTabChange('shopping')}
+                            onOpenAddBank={onAddClick}
+                        />
+                    </Suspense>
+                )}
+
+                {/* ═══════ CUOTAS TAB (CASHEA / KRECE) ═══════ */}
+                {activeTab === 'cuotas' && (
+                    <Suspense fallback={
+                        <div className="glass-surface rounded-2xl p-md h-64 flex items-center justify-center">
+                            <div className="text-center text-outline">
+                                <span className="material-symbols-outlined text-3xl animate-pulse mb-2 block">calendar_month</span>
+                                <p className="text-sm">Cargando cuotas...</p>
+                            </div>
+                        </div>
+                    }>
+                        <InstallmentTracker onNavigateToCalculator={() => onTabChange('calculator')} />
+                    </Suspense>
+                )}
+
+                {/* ═══════ SUELDO TAB (PURCHASING POWER) ═══════ */}
+                {activeTab === 'sueldo' && (
+                    <div className="animate-fade-in-up">
+                        <button
+                            type="button"
+                            onClick={() => onTabChange('home')}
+                            className="mb-3 text-xs font-bold text-outline hover:text-primary flex items-center gap-1 active:scale-95 transition-all"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Volver a Inicio
+                        </button>
+                        <Suspense fallback={
+                            <div className="glass-surface rounded-2xl p-md h-64 flex items-center justify-center">
+                                <div className="text-center text-outline">
+                                    <span className="material-symbols-outlined text-3xl animate-pulse mb-2 block">trending_down</span>
+                                    <p className="text-sm">Cargando termómetro...</p>
+                                </div>
+                            </div>
+                        }>
+                            <SalaryPurchasingPower onNavigateToCalculator={() => onTabChange('calculator')} />
+                        </Suspense>
+                    </div>
+                )}
+
                 {/* ═══════ CALCULATOR TAB ═══════ */}
                 {activeTab === 'calculator' && (
                     <>
@@ -270,6 +361,14 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 {/* ═══════ RATES / TASAS TAB ═══════ */}
                 {activeTab === 'rates' && (
                     <div className="animate-fade-in-up">
+                        <button
+                            type="button"
+                            onClick={() => onTabChange('home')}
+                            className="mb-3 text-xs font-bold text-outline hover:text-primary flex items-center gap-1 active:scale-95 transition-all"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Volver a Inicio
+                        </button>
                         <section className="mb-4 pt-2">
                             <span className="eyebrow mb-3"><span className="eyebrow-dot" />Mercado</span>
                             <h2 className="text-on-surface text-[28px] font-bold tracking-[-0.03em] leading-[1.1]">Historial de Tasas</h2>
@@ -305,6 +404,14 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 {/* ═══════ PROFILE TAB ═══════ */}
                 {activeTab === 'profile' && (
                     <div className="animate-fade-in-up">
+                        <button
+                            type="button"
+                            onClick={() => onTabChange('home')}
+                            className="mb-3 text-xs font-bold text-outline hover:text-primary flex items-center gap-1 active:scale-95 transition-all"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Volver a Inicio
+                        </button>
                         <section className="mb-6 pt-2">
                             <span className="eyebrow mb-3"><span className="eyebrow-dot" />Cuenta</span>
                             <h2 className="text-on-surface text-[28px] font-bold tracking-[-0.03em] leading-[1.1]">Perfil</h2>

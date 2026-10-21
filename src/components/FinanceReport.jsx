@@ -323,6 +323,48 @@ function FinanceReport({ savedLists = [], rate = 1, onGoToCart, onViewReceipt })
                 </div>
             </div>
 
+            {/* CENDAS-FMDV FAMILY BASKET BENCHMARK */}
+            <div className="card-glass p-4 rounded-2xl border border-white/10 space-y-2.5">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-secondary text-lg">stacked_line_chart</span>
+                        <span className="text-[10px] font-bold text-outline uppercase tracking-wider">Referencia Canasta Alimentaria (CENDAS)</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-secondary bg-secondary/15 px-2 py-0.5 rounded-full">
+                        Familia (5 pers.) ~$540
+                    </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                    <div>
+                        <p className="text-on-surface font-bold text-sm">
+                            {((metrics.totalUSD / 540) * 100).toFixed(1)}% de la canasta mensual
+                        </p>
+                        <p className="text-outline text-xs mt-0.5">
+                            Tu gasto de ${metrics.totalUSD.toFixed(2)} vs $540.00 referencia oficial CENDAS-FMDV
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                            metrics.totalUSD >= 540 
+                                ? 'bg-emerald-500/20 text-emerald-400' 
+                                : metrics.totalUSD >= 250 
+                                    ? 'bg-amber-500/20 text-amber-400' 
+                                    : 'bg-primary/20 text-primary'
+                        }`}>
+                            {metrics.totalUSD >= 540 ? 'Canasta Cubierta' : metrics.totalUSD >= 250 ? 'Gasto Familiar Medio' : 'Consumo Individual / Parcial'}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                    <div 
+                        className="h-full rounded-full bg-secondary transition-all duration-500"
+                        style={{ width: `${Math.min(100, (metrics.totalUSD / 540) * 100)}%` }}
+                    />
+                </div>
+            </div>
+
             {/* 4 CORE KPI METRIC CARDS */}
             <div className="grid grid-cols-2 gap-3">
                 {/* 1. Gasto Total */}
