@@ -15,53 +15,6 @@ function HomeHub({ onNavigateTab, onOpenReceiptScanner, onOpenAddBank }) {
         return '0.0';
     }, [rateBCV, rateUSDT]);
 
-    // Read upcoming Cashea / Krece installment from localStorage
-    const upcomingInstallment = useMemo(() => {
-        try {
-            const saved = localStorage.getItem('pm_pocket_installments');
-            if (!saved) return null;
-            const list = JSON.parse(saved);
-            let closestDays = Infinity;
-            let closestItem = null;
-            let totalDebtUSD = 0;
-            let pendingCount = 0;
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            list.forEach(purchase => {
-                purchase.installments.forEach((inst, idx) => {
-                    if (!inst.paid) {
-                        totalDebtUSD += inst.amountUSD;
-                        pendingCount += 1;
-                        const [y, m, d] = inst.dueDate.split('-').map(Number);
-                        const target = new Date(y, m - 1, d);
-                        target.setHours(0, 0, 0, 0);
-                        const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
-                        if (diffDays < closestDays) {
-                            closestDays = diffDays;
-                            closestItem = {
-                                ...inst,
-                                store: purchase.store,
-                                platform: purchase.platform,
-                                days: diffDays,
-                                amountVES: inst.amountUSD * (rateBCV || 1)
-                            };
-                        }
-                    }
-                });
-            });
-
-            return {
-                next: closestItem,
-                totalDebtUSD,
-                pendingCount
-            };
-        } catch {
-            return null;
-        }
-    }, [rateBCV]);
-
     // Read budget progress from localStorage
     const budgetData = useMemo(() => {
         try {
@@ -89,24 +42,6 @@ function HomeHub({ onNavigateTab, onOpenReceiptScanner, onOpenAddBank }) {
         }
     }, []);
 
-    // Rate forecast advantage: If tomorrow rate is higher
-    const rateAdvantage = useMemo(() => {
-        if (!hasTomorrowRate || !tomorrowRates.oficial || !upcomingInstallment?.next) return null;
-        const tomorrow = tomorrowRates.oficial;
-        if (tomorrow <= rateBCV) return null;
-
-        const nextUSD = upcomingInstallment.next.amountUSD;
-        const diffVES = (nextUSD * tomorrow) - (nextUSD * rateBCV);
-        if (diffVES > 1) {
-            return {
-                diffVES,
-                tomorrowRate: tomorrow,
-                percentIncrease: (((tomorrow - rateBCV) / rateBCV) * 100).toFixed(1)
-            };
-        }
-        return null;
-    }, [hasTomorrowRate, tomorrowRates, rateBCV, upcomingInstallment]);
-
     // Greeting
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -114,9 +49,6 @@ function HomeHub({ onNavigateTab, onOpenReceiptScanner, onOpenAddBank }) {
         if (hour < 18) return 'Buenas tardes';
         return 'Buenas noches';
     };
-
-    const nextInst = upcomingInstallment?.next;
-    const totalPendingDebt = upcomingInstallment?.totalDebtUSD || 0;
 
     return (
         <div className="space-y-6 animate-fade-in-up pb-12">
@@ -157,86 +89,75 @@ function HomeHub({ onNavigateTab, onOpenReceiptScanner, onOpenAddBank }) {
                     <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-outline uppercase tracking-[0.16em] flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                            Compromisos & Presupuesto Activo
+                            Gasto Activo & Presupuesto
                         </span>
                         <span className="text-[10px] font-bold text-zinc-300 px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10">
                             Mes en Curso
                         </span>
                     </div>
 
-                    {/* Big Hero Number: Active Obligations (Cuotas pendientes + Gasto en súper) */}
+                    {/* Big Hero Number: Monthly Spend */}
                     <div>
                         <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-extrabold text-white tracking-[-0.03em]">
-                                ${(totalPendingDebt + budgetData.spentUSD).toFixed(2)}
+                            <span className="text-4xl font-extrabold text-white tracking-[-0.03em] font-mono">
+                                ${budgetData.spentUSD.toFixed(2)}
                             </span>
                             <span className="text-xs font-semibold text-outline">USD</span>
                         </div>
                         <p className="text-outline text-xs mt-1">
-                            Equivalente a <strong className="text-zinc-200">Bs. {((totalPendingDebt + budgetData.spentUSD) * (rateBCV || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> a tasa BCV
+                            Equivalente a <strong className="text-zinc-200 font-mono">Bs. {(budgetData.spentUSD * (rateBCV || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> a tasa BCV
                         </p>
                     </div>
 
                     {/* Split Row: Two core pillars */}
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/[0.06]">
-                        {/* 1. Cuotas Pendientes */}
+                        {/* 1. Presupuesto Consumido */}
                         <div 
-                            onClick={() => onNavigateTab('cuotas')}
+                            onClick={() => onNavigateTab('finance')}
                             className="p-3 rounded-xl well border border-white/[0.05] cursor-pointer hover:border-white/20 transition-all"
                         >
                             <span className="text-[10px] font-bold text-outline uppercase tracking-wider block">
-                                Cuotas Cashea / Krece
+                                Presupuesto Mensual
                             </span>
-                            <p className="text-white font-bold text-lg mt-0.5">
-                                ${totalPendingDebt.toFixed(2)}
+                            <p className="text-white font-bold text-lg mt-0.5 font-mono">
+                                {budgetData.percent}%
                             </p>
-                            <span className="text-[10px] text-zinc-400 mt-0.5 block">
-                                {upcomingInstallment?.pendingCount || 0} cuota{(upcomingInstallment?.pendingCount || 0) === 1 ? '' : 's'} por pagar
+                            <span className="text-[10px] text-zinc-400 mt-0.5 block truncate">
+                                Quedan ${Math.max(0, budgetData.remaining).toFixed(2)}
                             </span>
                         </div>
 
-                        {/* 2. Gasto Supermercado */}
+                        {/* 2. Cobertura Canasta CENDAS */}
                         <div 
-                            onClick={() => onNavigateTab('shopping')}
+                            onClick={() => onNavigateTab('finance')}
                             className="p-3 rounded-xl well border border-white/[0.05] cursor-pointer hover:border-white/20 transition-all"
                         >
                             <span className="text-[10px] font-bold text-outline uppercase tracking-wider block">
-                                Compras del Mes
+                                Canasta CENDAS
                             </span>
-                            <p className="text-white font-bold text-lg mt-0.5">
-                                ${budgetData.spentUSD.toFixed(2)}
+                            <p className="text-white font-bold text-lg mt-0.5 font-mono">
+                                {((budgetData.spentUSD / 540) * 100).toFixed(1)}%
                             </p>
-                            <span className="text-[10px] text-zinc-400 mt-0.5 block">
-                                {budgetData.percent}% de ${budgetData.budgetUSD.toFixed(0)} meta
+                            <span className="text-[10px] text-zinc-400 mt-0.5 block truncate">
+                                $540 ref. familiar (5p)
                             </span>
                         </div>
                     </div>
 
                     {/* Integrated CTA Button (Nested Button-in-Button) */}
-                    {nextInst ? (
-                        <button
-                            type="button"
-                            onClick={() => onNavigateTab('cuotas')}
-                            className="press w-full h-12 rounded-2xl bg-white text-black font-bold text-xs flex items-center justify-between px-4 shadow-lg shadow-white/5 hover:bg-zinc-200 active:scale-[0.98] transition-all"
-                        >
-                            <span className="flex items-center gap-2 font-bold tracking-tight">
-                                <span className="material-symbols-outlined text-base">payments</span>
-                                Próxima cuota: {nextInst.store} (${nextInst.amountUSD.toFixed(2)})
-                            </span>
-                            <div className="w-7 h-7 rounded-full bg-black/10 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-xs">arrow_forward</span>
-                            </div>
-                        </button>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => onNavigateTab('cuotas')}
-                            className="press w-full h-11 rounded-2xl well border border-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-white/5 active:scale-[0.98] transition-all"
-                        >
-                            <span className="material-symbols-outlined text-sm">add_circle</span>
-                            Registrar nueva compra a plazos (Cashea / Krece)
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        onClick={() => onNavigateTab('finance')}
+                        className="press w-full h-12 rounded-2xl bg-white text-black font-bold text-xs flex items-center justify-between px-4 shadow-lg shadow-white/5 hover:bg-zinc-200 active:scale-[0.98] transition-all"
+                    >
+                        <span className="flex items-center gap-2 font-bold tracking-tight">
+                            <span className="material-symbols-outlined text-base">insights</span>
+                            Ver Suite de Control Financiero
+                        </span>
+                        <div className="w-7 h-7 rounded-full bg-black/10 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                        </div>
+                    </button>
                 </div>
             </div>
 
@@ -244,7 +165,7 @@ function HomeHub({ onNavigateTab, onOpenReceiptScanner, onOpenAddBank }) {
             <div className="grid grid-cols-4 gap-2.5">
                 {[
                     { id: 'scan', label: 'Escanear Ticket', icon: 'receipt_long', onClick: () => { onNavigateTab('shopping'); if (onOpenReceiptScanner) onOpenReceiptScanner(); } },
-                    { id: 'cuotas', label: 'Cuotas Cashea', icon: 'calendar_month', onClick: () => onNavigateTab('cuotas') },
+                    { id: 'finance', label: 'Control Financiero', icon: 'insights', onClick: () => onNavigateTab('finance') },
                     { id: 'calc', label: 'Calculadora', icon: 'calculate', onClick: () => onNavigateTab('calculator') },
                     { id: 'accounts', label: 'Mis Cuentas', icon: 'account_balance_wallet', onClick: () => onNavigateTab('accounts') }
                 ].map(action => (
@@ -345,73 +266,15 @@ function HomeHub({ onNavigateTab, onOpenReceiptScanner, onOpenAddBank }) {
                 </div>
             </div>
 
-            {/* ═══════ RATE HIKE SAVINGS ALERT (SMART CONTRACT-LIKE NOTIFICATION) ═══════ */}
-            {rateAdvantage && nextInst && (
-                <div 
-                    onClick={() => onNavigateTab('cuotas')}
-                    className="p-4 rounded-2xl bg-zinc-900 border border-white/20 space-y-2 cursor-pointer hover:border-white/40 transition-all animate-slide-down"
-                >
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-amber-300 text-lg">bolt</span>
-                            <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">
-                                Ahorro Detectado por Subida BCV
-                            </span>
-                        </div>
-                        <span className="text-[10px] font-bold text-zinc-300 bg-white/10 px-2 py-0.5 rounded-full">
-                            +{rateAdvantage.percentIncrease}% mañana
-                        </span>
-                    </div>
-                    <p className="text-xs text-zinc-300 leading-relaxed">
-                        El BCV fijó una tasa mayor para mañana (Bs. {rateAdvantage.tomorrowRate.toFixed(2)}). Si pagas hoy la cuota de <strong>{nextInst.store}</strong>, ahorras <strong className="text-white">Bs. {rateAdvantage.diffVES.toFixed(2)}</strong>.
-                    </p>
-                    <div className="pt-1 flex items-center justify-between">
-                        <span className="text-[11px] text-outline">Toca para ir al gestor de cuotas</span>
-                        <span className="text-xs font-bold text-white flex items-center gap-1">
-                            Pagar Hoy a Bs. {rateBCV.toFixed(2)} →
-                        </span>
-                    </div>
-                </div>
-            )}
-
             {/* ═══════ INTEGRATED ACTIVITY & HEALTH WIDGETS ═══════ */}
             <div className="space-y-3">
                 <span className="text-[10px] font-bold text-outline uppercase tracking-[0.16em] block px-1">
                     Ecosistema Financiero
                 </span>
 
-                {/* 1. Cashea Widget */}
-                {nextInst && (
-                    <div 
-                        onClick={() => onNavigateTab('cuotas')}
-                        className="card-glass p-4 rounded-2xl border border-white/[0.08] hover:border-white/20 transition-all cursor-pointer flex items-center justify-between"
-                    >
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-xl well border border-white/10 flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-white text-lg">calendar_month</span>
-                            </div>
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <p className="text-white font-bold text-xs truncate">{nextInst.store}</p>
-                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                                        nextInst.days <= 0 ? 'bg-red-500/20 text-red-400' :
-                                        nextInst.days <= 3 ? 'bg-amber-400/20 text-amber-300' : 'bg-white/10 text-zinc-300'
-                                    }`}>
-                                        {nextInst.days === 0 ? 'VENCE HOY' : nextInst.days < 0 ? `Vencida (${Math.abs(nextInst.days)}d)` : `Vence en ${nextInst.days}d`}
-                                    </span>
-                                </div>
-                                <p className="text-outline text-[11px] mt-0.5">
-                                    Cuota #{nextInst.number} • ${nextInst.amountUSD.toFixed(2)} • Bs. {nextInst.amountVES.toFixed(2)}
-                                </p>
-                            </div>
-                        </div>
-                        <span className="material-symbols-outlined text-outline text-base shrink-0 ml-2">chevron_right</span>
-                    </div>
-                )}
-
-                {/* 2. CENDAS Food Basket & Budget Progress */}
+                {/* 1. Presupuesto & Canasta CENDAS */}
                 <div 
-                    onClick={() => onNavigateTab('shopping')}
+                    onClick={() => onNavigateTab('finance')}
                     className="card-glass p-4 rounded-2xl border border-white/[0.08] hover:border-white/20 transition-all cursor-pointer space-y-2.5"
                 >
                     <div className="flex items-center justify-between">
@@ -425,7 +288,7 @@ function HomeHub({ onNavigateTab, onOpenReceiptScanner, onOpenAddBank }) {
                             </div>
                         </div>
                         <div className="text-right">
-                            <span className="text-xs font-bold text-white">${budgetData.spentUSD.toFixed(2)}</span>
+                            <span className="text-xs font-bold text-white font-mono">${budgetData.spentUSD.toFixed(2)}</span>
                             <span className="text-outline text-[10px] block">/ ${budgetData.budgetUSD.toFixed(0)} meta</span>
                         </div>
                     </div>
@@ -443,9 +306,26 @@ function HomeHub({ onNavigateTab, onOpenReceiptScanner, onOpenAddBank }) {
                     </div>
                 </div>
 
+                {/* 2. Price Radar */}
+                <div 
+                    onClick={() => onNavigateTab('finance')}
+                    className="card-glass p-4 rounded-2xl border border-white/[0.08] hover:border-white/20 transition-all cursor-pointer flex items-center justify-between"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl well border border-white/10 flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-white text-lg">search_insights</span>
+                        </div>
+                        <div>
+                            <p className="text-white font-bold text-xs">Radar de Precios & Detección de Inflación</p>
+                            <p className="text-outline text-[11px]">Compara precios históricos de alimentos y comercios</p>
+                        </div>
+                    </div>
+                    <span className="material-symbols-outlined text-outline text-base shrink-0">chevron_right</span>
+                </div>
+
                 {/* 3. Purchasing Power & Salary Defense */}
                 <div 
-                    onClick={() => onNavigateTab('sueldo')}
+                    onClick={() => onNavigateTab('finance')}
                     className="card-glass p-4 rounded-2xl border border-white/[0.08] hover:border-white/20 transition-all cursor-pointer flex items-center justify-between"
                 >
                     <div className="flex items-center gap-3">

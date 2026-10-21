@@ -5,14 +5,10 @@ import SavedListsModal from './SavedListsModal';
 
 const PriceScanner = lazy(() => import('./PriceScanner'));
 const ReceiptScanner = lazy(() => import('./ReceiptScanner'));
-const FinanceReport = lazy(() => import('./FinanceReport'));
 
-function ShoppingList() {
+function ShoppingList({ onGoToFinance }) {
     const { todayRates } = useRates();
     const rate = todayRates.oficial || 1;
-
-    // View Navigation: 'cart' | 'finance'
-    const [activeSubTab, setActiveSubTab] = useState('cart');
 
     // Attached receipt data & image from scanner
     const [attachedReceipt, setAttachedReceipt] = useState(null);
@@ -227,78 +223,41 @@ function ShoppingList() {
     return (
         <div className="animate-fade-in-up pb-52">
             {/* Header Section */}
-            <section className="mb-3 pt-2 flex items-center justify-between">
+            <section className="mb-4 pt-2 flex items-center justify-between">
                 <div>
-                    <span className="eyebrow mb-2"><span className="eyebrow-dot" />Finanzas & Compras</span>
+                    <span className="eyebrow mb-2"><span className="eyebrow-dot" />Compras & Carrito</span>
                     <h2 className="text-on-surface text-[26px] font-bold tracking-[-0.03em] leading-[1.1]">
-                        {activeSubTab === 'cart' ? 'Lista de Compras' : 'Control Financiero'}
+                        Lista de Compras
                     </h2>
                     <p className="text-on-surface-variant text-xs mt-0.5">
-                        {activeSubTab === 'cart' ? 'Controla lo que gastas en el súper' : 'Métricas, presupuestos y control de facturas'}
+                        Controla lo que gastas en el súper en tiempo real
                     </p>
                 </div>
-                <button 
-                    type="button"
-                    onClick={() => setShowSavedModal(true)}
-                    className="press h-9 px-3.5 rounded-full well text-xs font-bold text-primary flex items-center gap-1.5 shadow-sm shrink-0"
-                >
-                    <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-                    Facturas ({savedLists.length})
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                    {onGoToFinance && (
+                        <button 
+                            type="button"
+                            onClick={onGoToFinance}
+                            className="press h-9 px-3 rounded-full well text-xs font-bold text-outline hover:text-on-surface flex items-center gap-1.5 shadow-sm"
+                            title="Ir al Control Financiero"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">insights</span>
+                            Finanzas
+                        </button>
+                    )}
+                    <button 
+                        type="button"
+                        onClick={() => setShowSavedModal(true)}
+                        className="press h-9 px-3.5 rounded-full well text-xs font-bold text-primary flex items-center gap-1.5 shadow-sm shrink-0"
+                    >
+                        <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                        Facturas ({savedLists.length})
+                    </button>
+                </div>
             </section>
 
-            {/* Sub-tab Navigation (Apple Aero Segmented Control) */}
-            <div className="flex p-1 mb-5 rounded-2xl well gap-1 bg-surface-container/60 border border-white/5">
-                <button
-                    type="button"
-                    onClick={() => setActiveSubTab('cart')}
-                    className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
-                        activeSubTab === 'cart'
-                            ? 'bg-white text-black font-bold shadow-md'
-                            : 'text-outline hover:text-on-surface'
-                    }`}
-                >
-                    <span className="material-symbols-outlined text-base">shopping_cart</span>
-                    <span>Mi Carrito</span>
-                    {items.length > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${activeSubTab === 'cart' ? 'bg-black/20 text-black' : 'bg-white/10 text-white'}`}>
-                            {items.length}
-                        </span>
-                    )}
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => setActiveSubTab('finance')}
-                    className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
-                        activeSubTab === 'finance'
-                            ? 'bg-white text-black font-bold shadow-md'
-                            : 'text-outline hover:text-on-surface'
-                    }`}
-                >
-                    <span className="material-symbols-outlined text-base">insights</span>
-                    <span>Control Financiero</span>
-                </button>
-            </div>
-
-            {/* TAB 1: FINANCIAL REPORTS & CONTROL */}
-            {activeSubTab === 'finance' ? (
-                <Suspense fallback={
-                    <div className="card-glass p-12 text-center text-outline my-6">
-                        <span className="material-symbols-outlined text-3xl animate-spin mb-2 block text-primary">hourglass_empty</span>
-                        <p className="text-xs font-bold">Cargando reporte financiero...</p>
-                    </div>
-                }>
-                    <FinanceReport 
-                        savedLists={savedLists}
-                        rate={rate}
-                        onGoToCart={() => setActiveSubTab('cart')}
-                        onViewReceipt={(img) => setViewingReceiptPreview(img)}
-                    />
-                </Suspense>
-            ) : (
-                /* TAB 2: ACTIVE SHOPPING CART */
-                <div>
+            {/* ACTIVE SHOPPING CART */}
+            <div>
                     {/* Attached Receipt Notification Banner */}
                     {attachedReceipt && (
                         <div className="card-glass border-secondary/40 bg-secondary/10 p-3.5 rounded-2xl flex items-center justify-between mb-4 animate-slide-down">
@@ -590,39 +549,36 @@ function ShoppingList() {
                 </div>
             )}
         </div>
-    )}
 
-            {/* FLOATING TOTAL BAR (Visible only in active cart) */}
-            {activeSubTab === 'cart' && (
-                <div className="fixed bottom-[84px] left-3 right-3 z-40 pointer-events-none">
-                    <div className="max-w-md mx-auto">
-                        <div className="glass-aero card-sheen rounded-[24px] p-3.5 px-4 flex items-center justify-between pointer-events-auto shadow-2xl border border-white/10">
-                            <div className="min-w-0 pr-2">
-                                <p className="text-[10px] text-outline uppercase font-bold tracking-[0.14em] mb-0.5">Total Estimado</p>
-                                <p className="text-on-surface font-bold text-sm">
-                                    Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                                <p className="text-primary text-[26px] font-bold tracking-tight leading-none">
-                                    ${totalUSD.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </p>
-                                {items.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={handleOpenSaveDialog}
-                                        className="press h-9 px-3 rounded-full thumb-primary text-white font-bold text-xs flex items-center gap-1 shadow-md"
-                                        title="Guardar lista de compra"
-                                    >
-                                        <span className="material-symbols-outlined text-[14px]">save</span>
-                                        Guardar
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+        {/* FLOATING TOTAL BAR */}
+        <div className="fixed bottom-[84px] left-3 right-3 z-40 pointer-events-none">
+            <div className="max-w-md mx-auto">
+                <div className="glass-aero card-sheen rounded-[24px] p-3.5 px-4 flex items-center justify-between pointer-events-auto shadow-2xl border border-white/10">
+                    <div className="min-w-0 pr-2">
+                        <p className="text-[10px] text-outline uppercase font-bold tracking-[0.14em] mb-0.5">Total Estimado</p>
+                        <p className="text-on-surface font-bold text-sm">
+                            Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                        <p className="text-primary text-[26px] font-bold tracking-tight leading-none">
+                            ${totalUSD.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        {items.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={handleOpenSaveDialog}
+                                className="press h-9 px-3 rounded-full thumb-primary text-white font-bold text-xs flex items-center gap-1 shadow-md"
+                                title="Guardar lista de compra"
+                            >
+                                <span className="material-symbols-outlined text-[14px]">save</span>
+                                Guardar
+                            </button>
+                        )}
                     </div>
                 </div>
-            )}
+            </div>
+        </div>
 
             {/* FULLSCREEN RECEIPT PREVIEW MODAL */}
             {viewingReceiptPreview && (

@@ -8,8 +8,7 @@ import DiscountCalculator from './DiscountCalculator';
 const RateHistoryChart = lazy(() => import('./RateHistoryChart'));
 const ShoppingList = lazy(() => import('./ShoppingList'));
 const HomeHub = lazy(() => import('./HomeHub'));
-const InstallmentTracker = lazy(() => import('./InstallmentTracker'));
-const SalaryPurchasingPower = lazy(() => import('./SalaryPurchasingPower'));
+const FinanceCenter = lazy(() => import('./FinanceCenter'));
 import { getConversionHistory, clearConversionHistory } from './ConversionHistory';
 import { CurrencyFlag } from './FlagIcons';
 
@@ -35,8 +34,8 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
             const historyData = localStorage.getItem('pm_pocket_conversion_history') || '[]';
             const shoppingItems = localStorage.getItem('shoppingListItems') || '[]';
             const shoppingSaved = localStorage.getItem('shoppingSavedLists') || '[]';
-            const installments = localStorage.getItem('pm_pocket_installments') || '[]';
             const salaryEntries = localStorage.getItem('pm_pocket_salary_entries') || '[]';
+            const monthlyBudget = localStorage.getItem('shopping_monthly_budget') || '200';
             
             const backup = {
                 version: appVersion,
@@ -45,8 +44,8 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                 history: JSON.parse(historyData),
                 shoppingItems: JSON.parse(shoppingItems),
                 shoppingSavedLists: JSON.parse(shoppingSaved),
-                installments: JSON.parse(installments),
-                salaryEntries: JSON.parse(salaryEntries)
+                salaryEntries: JSON.parse(salaryEntries),
+                monthlyBudget: parseFloat(monthlyBudget) || 200
             };
 
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -108,14 +107,14 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                     localStorage.setItem('shoppingSavedLists', JSON.stringify(data.shoppingSavedLists));
                 }
 
-                // Validate installments
-                if (Array.isArray(data.installments)) {
-                    localStorage.setItem('pm_pocket_installments', JSON.stringify(data.installments));
-                }
-
                 // Validate salary entries
                 if (Array.isArray(data.salaryEntries)) {
                     localStorage.setItem('pm_pocket_salary_entries', JSON.stringify(data.salaryEntries));
+                }
+
+                // Validate monthly budget
+                if (data.monthlyBudget && typeof data.monthlyBudget === 'number') {
+                    localStorage.setItem('shopping_monthly_budget', data.monthlyBudget.toString());
                 }
                 
                 alert('¡Datos restaurados con éxito! La aplicación se recargará.');
@@ -154,8 +153,8 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
     const navItems = [
         { id: 'home', icon: 'dashboard', label: 'Inicio', fill: true },
         { id: 'calculator', icon: 'calculate', label: 'Calculadora', fill: true },
-        { id: 'cuotas', icon: 'calendar_month', label: 'Cuotas', fill: false },
-        { id: 'shopping', icon: 'receipt_long', label: 'Finanzas', fill: false },
+        { id: 'finance', icon: 'insights', label: 'Finanzas', fill: false },
+        { id: 'shopping', icon: 'shopping_cart', label: 'Compras', fill: false },
         { id: 'accounts', icon: 'account_balance_wallet', label: 'Cuentas', fill: false },
     ];
 
@@ -227,42 +226,21 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                     </Suspense>
                 )}
 
-                {/* ═══════ CUOTAS TAB (CASHEA / KRECE) ═══════ */}
-                {activeTab === 'cuotas' && (
+                {/* ═══════ FINANCE CENTER TAB ═══════ */}
+                {activeTab === 'finance' && (
                     <Suspense fallback={
                         <div className="glass-surface rounded-2xl p-md h-64 flex items-center justify-center">
                             <div className="text-center text-outline">
-                                <span className="material-symbols-outlined text-3xl animate-pulse mb-2 block">calendar_month</span>
-                                <p className="text-sm">Cargando cuotas...</p>
+                                <span className="material-symbols-outlined text-3xl animate-pulse mb-2 block">insights</span>
+                                <p className="text-sm">Cargando centro financiero...</p>
                             </div>
                         </div>
                     }>
-                        <InstallmentTracker onNavigateToCalculator={() => onTabChange('calculator')} />
+                        <FinanceCenter 
+                            onGoToShopping={() => onTabChange('shopping')}
+                            onGoToCalculator={() => onTabChange('calculator')}
+                        />
                     </Suspense>
-                )}
-
-                {/* ═══════ SUELDO TAB (PURCHASING POWER) ═══════ */}
-                {activeTab === 'sueldo' && (
-                    <div className="animate-fade-in-up">
-                        <button
-                            type="button"
-                            onClick={() => onTabChange('home')}
-                            className="mb-3 text-xs font-bold text-outline hover:text-primary flex items-center gap-1 active:scale-95 transition-all"
-                        >
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Volver a Inicio
-                        </button>
-                        <Suspense fallback={
-                            <div className="glass-surface rounded-2xl p-md h-64 flex items-center justify-center">
-                                <div className="text-center text-outline">
-                                    <span className="material-symbols-outlined text-3xl animate-pulse mb-2 block">trending_down</span>
-                                    <p className="text-sm">Cargando termómetro...</p>
-                                </div>
-                            </div>
-                        }>
-                            <SalaryPurchasingPower onNavigateToCalculator={() => onTabChange('calculator')} />
-                        </Suspense>
-                    </div>
                 )}
 
                 {/* ═══════ CALCULATOR TAB ═══════ */}
@@ -397,7 +375,7 @@ function Dashboard({ banks, onAddClick, onEditClick, onDelete, appVersion, activ
                             </div>
                         </div>
                     }>
-                        <ShoppingList />
+                        <ShoppingList onGoToFinance={() => onTabChange('finance')} />
                     </Suspense>
                 )}
 
