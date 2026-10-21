@@ -52,9 +52,10 @@ export async function getOCRWorker(lang = 'eng', onProgress = null) {
             }
         });
 
-        // Set parameters for numeric & price recognition
+        // Set parameters for numeric & price recognition with single uniform block mode for tabular receipts
         await worker.setParameters({
-            tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzáéíóúÁÉÍÓÚñÑ$,.:;/-+%*()#@&[] \n\r',
+            tessedit_pageseg_mode: '6',
+            tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzáéíóúÁÉÍÓÚñÑüÜ$,.:;/-+%*()#@&[]"\'= \n\r',
         });
 
         cachedWorker = worker;
@@ -137,8 +138,8 @@ export function preprocessCanvasForOCR(source, options = {}) {
         sh = crop.h ?? sH;
     }
 
-    // Scale to balanced resolution for speed + OCR accuracy
-    const maxDimension = mode === 'receipt' ? 1800 : 1200;
+    // Scale to balanced resolution for speed + OCR accuracy (2600 for long receipts)
+    const maxDimension = mode === 'receipt' ? 2600 : 1400;
     let targetW = sw;
     let targetH = sh;
 
@@ -186,8 +187,8 @@ export function preprocessCanvasForOCR(source, options = {}) {
             lum = Math.min(255, Math.max(0, lum));
 
             if (mode === 'receipt') {
-                // Adaptive high contrast for faint thermal receipt text
-                lum = lum < 140 ? lum * 0.7 : Math.min(255, lum * 1.25);
+                // Adaptive high contrast for thermal receipts preserving dot-matrix patterns
+                lum = lum < 130 ? lum * 0.75 : Math.min(255, lum * 1.15);
             } else {
                 // Label tag contrast
                 lum = lum < 128 ? lum * 0.8 : Math.min(255, lum * 1.15);
@@ -253,7 +254,8 @@ export async function scanPriceTag(imageSource, options = {}) {
     // Extract product name candidate from remaining text
     let cleanName = text
         .replace(/(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2})?)/g, '')
-        .replace(/[$€¥BsRefPVP%/.:;,\-_=]/gi, ' ')
+        .replace(/\b(?:Bs\.?|Ref\.?|PVP|USD|EUR|VES)\b/gi, '')
+        .replace(/[$€¥%/.:;,\-_=]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
@@ -269,24 +271,36 @@ export async function scanPriceTag(imageSource, options = {}) {
 }
 
 /**
- * Scan and parse a full receipt/ticket
- * Extracts store name, totals (VES and USD), taxes (IVA, IGTF 3%), BCV rate, and item rows.
+ * Parse raw text of a Venezuelan invoice / receipt
+ * Extracts supermarket name, totals (VES and USD), taxes (IVA 16%, IGTF 3%), BCV rate, and item rows.
+ * Works with fiscal printer formats (multi-line, single-line, reverse lines) and withstands thermal dot-matrix glitches.
  */
-export async function scanReceipt(imageSource, options = {}) {
-    const { onProgress = null } = options;
-    const canvas = preprocessCanvasForOCR(imageSource, { mode: 'receipt' });
-    const worker = await getOCRWorker('eng', onProgress);
+export function parseReceiptText(text) {
+    if (!text || typeof text !== 'string') {
+        return {
+            supermarketName: 'Supermercado',
+            invoiceNumber: '',
+            invoiceDate: new Date().toLocaleDateString('es-VE'),
+            rate: null,
+            totalVES: null,
+            totalUSD: null,
+            ivaVES: null,
+            igtfVES: null,
+            exentoVES: null,
+            baseVES: null,
+            items: [],
+            rawText: ''
+        };
+    }
 
-    const { data: { text } } = await worker.recognize(canvas);
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-    // 1. Detect store name (first 1-4 lines usually contain the store name)
+    // 1. Detect Store Name (first 1-6 non-metadata lines)
     let supermarketName = '';
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
+    for (let i = 0; i < Math.min(6, lines.length); i++) {
         const line = lines[i];
-        if (line.length > 3 && !/^(rif|factura|fecha|seniat|caja|sucursal|hora)/i.test(line)) {
-            // Check for common stores or uppercase title
-            if (/plaza|gama|central|diego|forum|rio|daka|traki|farmatodo|biomercado|luxor|garzon/i.test(line) || line === line.toUpperCase()) {
+        if (line.length >= 3 && !/^(rif|factura|fecha|seniat|caja|sucursal|hora|cajero|forma\s*libre|control|n[roº°])/i.test(line)) {
+            if (/plaza|gama|central|san\s*diego|forum|rio|daka|traki|farmatodo|biomercado|luxor|garzon|kromi|automercado|supermercado|hiper|inversiones|comercial/i.test(line) || (line === line.toUpperCase() && line.length > 5)) {
                 supermarketName = line.replace(/[^a-zA-Z0-9\s.'&-]/g, '').trim();
                 break;
             }
@@ -296,56 +310,56 @@ export async function scanReceipt(imageSource, options = {}) {
         supermarketName = lines[0].replace(/[^a-zA-Z0-9\s.'&-]/g, '').trim();
     }
 
-    // 2. Detect Invoice Number & Date
+    // 2. Invoice Date & Number
     let invoiceNumber = '';
     let invoiceDate = '';
     const dateMatch = text.match(/(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/);
     if (dateMatch) invoiceDate = dateMatch[1];
 
-    const invMatch = text.match(/(?:factura|fact|doc|control|n[ºo°]?)[.:\s#]*([a-z0-9-]+)/i);
+    const invMatch = text.match(/(?:factura|fact|doc|control|n[ºo°]?|nro)[.:\s#]*([a-z0-9-]+)/i);
     if (invMatch && invMatch[1].length >= 3) {
         invoiceNumber = invMatch[1].toUpperCase();
     }
 
-    // 3. Detect BCV Rate / Tasa de cambio
+    // 3. BCV Rate
     let rate = null;
-    const rateMatch = text.match(/(?:tasa|bcv|cambio|t\.c\.)[^\d]*(\d{1,3}(?:[.,]\d{1,4}))/i);
+    const rateMatch = text.match(/(?:tasa(?:\s*de\s*cambio)?|bcv|cambio|t\.c\.|tasa\s*oficial)[^\d]*(\d{1,3}(?:[.,]\d{1,4}))/i);
     if (rateMatch) {
         const parsedRate = parsePriceCandidate(rateMatch[1]);
         if (parsedRate.value > 0) rate = parsedRate.value;
     }
 
-    // 4. Detect Totals
+    // 4. Totals (VES & USD)
     let totalVES = null;
     let totalUSD = null;
 
     for (const line of lines) {
-        // Total USD
-        if (/total\s*(?:usd|\$|divisas?|ref)/i.test(line)) {
-            const m = line.match(/(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2})?)/);
-            if (m) totalUSD = parsePriceCandidate(m[1]).value;
+        // Total USD / Divisas / Ref
+        if (/total\s*(?:usd|\$|divisas?|ref|dolares)/i.test(line) || /(?:usd|\$|divisas?|ref)\s*total/i.test(line)) {
+            const matches = [...line.matchAll(/(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2})?)/g)];
+            if (matches.length > 0) {
+                const parsed = parsePriceCandidate(matches[matches.length - 1][0]);
+                if (parsed.value > 0 && !totalUSD) totalUSD = parsed.value;
+            }
         }
-        // Total VES / Total General
-        if (/total\s*(?:bs|ves|pagar|general|a\s*pagar)?/i.test(line)) {
+        // Total VES / A pagar / Total General
+        if (/total\s*(?:a\s*pagar|general|bs|ves|pagar)?/i.test(line) && !/subtotal|iva|igtf|base/i.test(line)) {
             const matches = [...line.matchAll(/(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2})?)/g)];
             if (matches.length > 0) {
                 const last = matches[matches.length - 1];
                 const parsed = parsePriceCandidate(last[0]);
-                if (parsed.value > 0 && !totalVES) {
-                    totalVES = parsed.value;
-                }
+                if (parsed.value > 0 && !totalVES) totalVES = parsed.value;
             }
         }
     }
 
-    // Fallback: If totalVES is set and rate is set, compute USD or vice versa
     if (totalVES && rate && !totalUSD) {
         totalUSD = parseFloat((totalVES / rate).toFixed(2));
     } else if (totalUSD && rate && !totalVES) {
         totalVES = parseFloat((totalUSD * rate).toFixed(2));
     }
 
-    // 5. Detect Taxes (IVA 16%, IGTF 3%, Exento, Base Imponible)
+    // 5. Taxes (IVA, IGTF, Exento, Base)
     let ivaVES = null;
     let igtfVES = null;
     let exentoVES = null;
@@ -363,46 +377,59 @@ export async function scanReceipt(imageSource, options = {}) {
     const baseMatch = text.match(/(?:base\s*imponible|base\s*gravada)[^\d]*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2})?)/i);
     if (baseMatch) baseVES = parsePriceCandidate(baseMatch[1]).value;
 
-    // 6. Detect Product Line Items (Single-line & Multi-line formats)
+    // Helper: strip fiscal printer tax flags and trailing suffixes
+    const stripFiscalSuffix = (str) => {
+        return str
+            .replace(/(?:\s+|\b)(?:\([EGR]\)|\*[EGR]|\(EX\)|EX|\(16%?\)|16%|\(3%?\)|3%|\(0%?\)|0%|BI|BIA|BS\.?|\$|Ref|USD|[EGR])\s*$/i, '')
+            .trim();
+    };
+
+    // Helper: clean product description
+    const cleanProductName = (str) => {
+        if (!str) return '';
+        return str
+            .replace(/^[\d#.-]+\s+/, '')      // Strip leading sequence "001 " or "1. " or "#2 "
+            .replace(/\b\d{8,14}\b/g, '')     // Strip barcodes
+            .replace(/\b(?:Bs\.?|Ref\.?|PVP|USD|EUR|VES)\b/gi, '') // Strip currency words
+            .replace(/[$€¥]/g, '')
+            .replace(/[^a-zA-Z0-9\sáéíóúñÁÉÍÓÚÑ./%&-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
+    // Helper: check if a line is a header/footer/metadata line that cannot be an item
+    const isNonItemLine = (line) => {
+        const clean = line.toLowerCase().trim();
+        if (supermarketName && clean === supermarketName.toLowerCase()) return true;
+        return /^(total|subtotal|sub\s*total|sub-total|iva|igtf|tasa|bcv|cambio|t\.c\.|fecha|hora|rif|cajero|caja|gracias|seniat|factura|vuelto|pago|tarjeta|efectivo|debito|credito|biopago|pago\s*movil|lote|aprobacion|referencia|serial|direccion|telefono|servicios?|base\s*imponible|base\s*gravada|exento|exentas|ventas|sucursal|imprenta|fiscal|control|forma\s*libre|cliente|cedula|ci:|c\.i\.|razon\s*social|domicilio|ticket|numero|nro|articulo|cant|descripcion|monto|precio|p\.v\.p|pvp|item|items|resumen|linea|piezas|vendedor|descuento|saldo|banco|punto|orden|operacion|deposito|transferencia)/i.test(clean);
+    };
+
+    // 6. Multi-format Item Line Parser
     const items = [];
     let itemIdCounter = 1;
 
     for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
+        let line = lines[i].trim();
+        if (!line || isNonItemLine(line)) continue;
 
-        // Skip non-item lines (headers, footers, fiscal metadata)
-        if (/^(total|subtotal|iva|igtf|tasa|bcv|cambio|fecha|hora|rif|cajero|caja|gracias|seniat|factura|vuelto|pago|tarjeta|efectivo|debito|credito|biopago|pago\s*movil|lote|aprobacion|referencia|serial|direccion|telefono|servicios?|base|exento)/i.test(line)) {
-            continue;
-        }
+        let cleanedLine = stripFiscalSuffix(line);
 
-        // Strip fiscal printer tax flags and trailing currency symbols at the end of the line, e.g. (E), (G), (R), *E, *G, Bs, $
-        const cleanedLine = line.replace(/\s*(?:\([EGR]\)|[EGR]|\*|BS\.?|\$)\s*$/i, '').trim();
-
-        // Pattern 1: [NOMBRE] [CANT] x [PRECIO UNIT] [PRECIO TOTAL] (e.g. "HARINA PAN 2 X 48,50 97,00")
-        const qtyXPriceMatch = cleanedLine.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*(?:KG|KGR|GR|LT|L|PZA|UNID|UNI)?\s*[xX*@]\s*(?:\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))?\s+(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))$/i);
-
+        // ── FORMAT 1: Standard Quantity X UnitPrice and Total on single line ──
+        // e.g. "HARINA PAN 1KG 2 X 48,50 97,00" or "HARINA 1KG 2,000 X 48,50 97,00"
+        const qtyXPriceMatch = cleanedLine.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*(?:KG|KGR|GR|G|LT|L|ML|PZA|PZAS|UNID|UNI|PAQ|PQ)?\s*[xX*@]\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))?\s+(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))$/i);
         if (qtyXPriceMatch) {
-            const rawName = qtyXPriceMatch[1].trim();
+            const name = cleanProductName(qtyXPriceMatch[1]);
             const rawQty = qtyXPriceMatch[2];
-            const parsedTotalPrice = parsePriceCandidate(qtyXPriceMatch[3]);
-
-            const cleanName = rawName
-                .replace(/^[\d#.-]+\s+/, '')
-                .replace(/\b\d{8,14}\b/g, '') // remove barcode if present
-                .replace(/[^a-zA-Z0-9\sáéíóúñÁÉÍÓÚÑ./-]/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-
-            if (cleanName.length >= 2 && parsedTotalPrice.value > 0) {
+            const parsedTotalPrice = parsePriceCandidate(qtyXPriceMatch[4] || qtyXPriceMatch[3]);
+            if (name.length >= 2 && parsedTotalPrice.value > 0) {
                 let qty = 1;
                 if (rawQty) {
                     const parsedQty = parseFloat(rawQty.replace(',', '.'));
                     if (!isNaN(parsedQty) && parsedQty > 0) qty = parsedQty;
                 }
-
                 items.push({
                     id: `receipt-item-${Date.now()}-${itemIdCounter++}`,
-                    name: cleanName.toUpperCase(),
+                    name: name.toUpperCase(),
                     quantity: qty,
                     price: parsedTotalPrice.value,
                     formattedPrice: parsedTotalPrice.formatted,
@@ -412,66 +439,120 @@ export async function scanReceipt(imageSource, options = {}) {
             }
         }
 
-        // Pattern 2: Standard single line: [NOMBRE] [PRECIO] or [NOMBRE] [CANT] [PRECIO]
-        const singleLineMatch = cleanedLine.match(/^(.*?)(?:\s+(\d+(?:[.,]\d+)?)\s*(?:KG|KGR|GR|LT|L|PZA|UNID|UNI)?)?\s+(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))$/i);
+        // Check if line is purely a quantity multiplier (e.g. "1.000 X 48.50 48.50")
+        const isQtyLine = /^\s*(\d+(?:[.,]\d+)?)\s*(?:KG|KGR|GR|G|LT|L|ML|PZA|PZAS|UNID|UNI)?\s*[xX*@]/i.test(cleanedLine);
 
-        if (singleLineMatch) {
-            const rawName = singleLineMatch[1].trim();
-            const rawQty = singleLineMatch[2];
-            const parsedPrice = parsePriceCandidate(singleLineMatch[3]);
+        // ── FORMAT 2: Name followed by Price at the end of the line ──
+        // e.g. "HARINA PAN BLANCA 1KG 48,50" or "01 ACETAMINOFEN 500MG 45.00" or "48,5O"
+        if (!isQtyLine) {
+            const singleLineMatch = cleanedLine.match(/^(.*?)\s+([0-9Oo]{1,3}(?:[.,][0-9Oo]{3})*(?:[.,][0-9Oo]{1,2})|[0-9Oo]+(?:[.,][0-9Oo]{1,2})|[0-9]+)$/);
+            if (singleLineMatch) {
+                let rawName = singleLineMatch[1].trim();
+                const parsedPrice = parsePriceCandidate(singleLineMatch[2]);
 
-            const cleanName = rawName
-                .replace(/^[\d#.-]+\s+/, '') // Remove leading item number e.g. "001 "
-                .replace(/\b\d{8,14}\b/g, '') // Remove barcode
-                .replace(/[^a-zA-Z0-9\sáéíóúñÁÉÍÓÚÑ./-]/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-
-            if (cleanName.length >= 2 && parsedPrice.value > 0) {
+                // Check if rawName has an embedded quantity, e.g. "HARINA PAN 2 X" or "2 UNID"
                 let qty = 1;
-                if (rawQty) {
-                    const parsedQty = parseFloat(rawQty.replace(',', '.'));
-                    if (!isNaN(parsedQty) && parsedQty > 0) qty = parsedQty;
+                const embedQtyMatch = rawName.match(/\s+(\d+(?:[.,]\d+)?)\s*(?:KG|KGR|GR|G|LT|L|ML|PZA|PZAS|UNID|UNI|PAQ|PQ)?\s*[xX*@]\s*$/i);
+                if (embedQtyMatch) {
+                    const parsedQ = parseFloat(embedQtyMatch[1].replace(',', '.'));
+                    if (!isNaN(parsedQ) && parsedQ > 0) qty = parsedQ;
+                    rawName = rawName.replace(embedQtyMatch[0], '');
                 }
 
-                items.push({
-                    id: `receipt-item-${Date.now()}-${itemIdCounter++}`,
-                    name: cleanName.toUpperCase(),
-                    quantity: qty,
-                    price: parsedPrice.value,
-                    formattedPrice: parsedPrice.formatted,
-                    rawLine: line
-                });
-                continue;
-            }
-        }
-
-        // Pattern 3: Multi-line: Line i is Name, Line i+1 is Quantity x Price Total
-        if (i + 1 < lines.length) {
-            const nextLine = lines[i + 1].trim();
-            const multiLineQtyMatch = nextLine.match(/(\d+(?:[.,]\d+)?)\s*(?:KG|KGR|GR|LT|L|PZA|UNID|UNI)?\s*[xX*@]\s*(?:\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))?\s+(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))/i);
-            
-            if (multiLineQtyMatch && line.length >= 2 && !/^\d+$/.test(line)) {
-                const cleanName = line
-                    .replace(/^[\d#.-]+\s+/, '')
-                    .replace(/\b\d{8,14}\b/g, '')
-                    .replace(/[^a-zA-Z0-9\sáéíóúñÁÉÍÓÚÑ./-]/g, ' ')
-                    .replace(/\s+/g, ' ')
-                    .trim();
-
-                const parsedTotalPrice = parsePriceCandidate(multiLineQtyMatch[2]);
-                const parsedQty = parseFloat(multiLineQtyMatch[1].replace(',', '.'));
-
-                if (cleanName.length >= 2 && parsedTotalPrice.value > 0) {
+                const cleanName = cleanProductName(rawName);
+                if (cleanName.length >= 2 && parsedPrice.value > 0) {
+                    // Ensure it's not a misplaced total
+                    if (totalVES && Math.abs(parsedPrice.value - totalVES) < 0.05 && /total/i.test(cleanName)) {
+                        continue;
+                    }
                     items.push({
                         id: `receipt-item-${Date.now()}-${itemIdCounter++}`,
                         name: cleanName.toUpperCase(),
-                        quantity: (!isNaN(parsedQty) && parsedQty > 0) ? parsedQty : 1,
-                        price: parsedTotalPrice.value,
-                        formattedPrice: parsedTotalPrice.formatted,
-                        rawLine: `${line} | ${nextLine}`
+                        quantity: qty,
+                        price: parsedPrice.value,
+                        formattedPrice: parsedPrice.formatted,
+                        rawLine: line
                     });
-                    i++; // skip next line
+                    continue;
+                }
+            }
+        }
+
+        // ── FORMAT 3: Multi-line (Name on Line i, Quantity x Price on Line i+1) ──
+        // Line i:   "001 HARINA PAN 1KG"
+        // Line i+1: "1,000 X 48,50 48,50 (E)" or "48,50 (E)"
+        if (i + 1 < lines.length) {
+            const nextLine = lines[i + 1].trim();
+            if (!isNonItemLine(nextLine)) {
+                const nextCleaned = stripFiscalSuffix(nextLine);
+
+                // Option 3A: nextLine has Quantity x Price
+                const nextQtyMatch = nextCleaned.match(/(\d+(?:[.,]\d+)?)\s*(?:KG|KGR|GR|G|LT|L|ML|PZA|PZAS|UNID|UNI)?\s*[xX*@]\s*(?:\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))?\s+(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))/i);
+                if (nextQtyMatch) {
+                    const name = cleanProductName(cleanedLine);
+                    const parsedTotalPrice = parsePriceCandidate(nextQtyMatch[2]);
+                    const parsedQty = parseFloat(nextQtyMatch[1].replace(',', '.'));
+
+                    if (name.length >= 2 && parsedTotalPrice.value > 0) {
+                        items.push({
+                            id: `receipt-item-${Date.now()}-${itemIdCounter++}`,
+                            name: name.toUpperCase(),
+                            quantity: (!isNaN(parsedQty) && parsedQty > 0) ? parsedQty : 1,
+                            price: parsedTotalPrice.value,
+                            formattedPrice: parsedTotalPrice.formatted,
+                            rawLine: `${line} | ${nextLine}`
+                        });
+                        i++; // skip nextLine
+                        continue;
+                    }
+                }
+
+                // Option 3B: nextLine is simply the price alone
+                // e.g. Line i: "HARINA PAN 1KG", Line i+1: "48,50"
+                const nextOnlyPrice = nextCleaned.match(/^([0-9Oo]{1,3}(?:[.,][0-9Oo]{3})*(?:[.,][0-9Oo]{1,2})|[0-9Oo]+(?:[.,][0-9Oo]{1,2})|[0-9]+)$/);
+                if (nextOnlyPrice) {
+                    const name = cleanProductName(cleanedLine);
+                    const parsedTotalPrice = parsePriceCandidate(nextOnlyPrice[1]);
+                    if (name.length >= 2 && parsedTotalPrice.value > 0) {
+                        items.push({
+                            id: `receipt-item-${Date.now()}-${itemIdCounter++}`,
+                            name: name.toUpperCase(),
+                            quantity: 1,
+                            price: parsedTotalPrice.value,
+                            formattedPrice: parsedTotalPrice.formatted,
+                            rawLine: `${line} | ${nextLine}`
+                        });
+                        i++; // skip nextLine
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // ── FORMAT 4: Reverse Multi-line (Quantity/Price on Line i, Name on Line i+1) ──
+        // Line i:   "1.000 X 48.50 48.50"
+        // Line i+1: "HARINA PAN 1KG"
+        if (i + 1 < lines.length) {
+            const nextLine = lines[i + 1].trim();
+            if (!isNonItemLine(nextLine)) {
+                const qtyMatchThis = cleanedLine.match(/^(\d+(?:[.,]\d+)?)\s*(?:KG|KGR|GR|G|LT|L|ML|PZA|PZAS|UNID|UNI)?\s*[xX*@]\s*(?:\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))?\s+(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|\d+(?:[.,]\d{1,2}))$/i);
+                if (qtyMatchThis) {
+                    const name = cleanProductName(stripFiscalSuffix(nextLine));
+                    const parsedTotalPrice = parsePriceCandidate(qtyMatchThis[2]);
+                    const parsedQty = parseFloat(qtyMatchThis[1].replace(',', '.'));
+
+                    if (name.length >= 2 && parsedTotalPrice.value > 0) {
+                        items.push({
+                            id: `receipt-item-${Date.now()}-${itemIdCounter++}`,
+                            name: name.toUpperCase(),
+                            quantity: (!isNaN(parsedQty) && parsedQty > 0) ? parsedQty : 1,
+                            price: parsedTotalPrice.value,
+                            formattedPrice: parsedTotalPrice.formatted,
+                            rawLine: `${cleanedLine} | ${nextLine}`
+                        });
+                        i++; // skip nextLine
+                        continue;
+                    }
                 }
             }
         }
@@ -489,6 +570,24 @@ export async function scanReceipt(imageSource, options = {}) {
         exentoVES,
         baseVES,
         items,
+        rawText: text
+    };
+}
+
+/**
+ * Scan and parse a full receipt/ticket image
+ * Preprocesses canvas, executes OCR, and parses all items and fiscal breakdown.
+ */
+export async function scanReceipt(imageSource, options = {}) {
+    const { onProgress = null } = options;
+    const canvas = preprocessCanvasForOCR(imageSource, { mode: 'receipt' });
+    const worker = await getOCRWorker('eng', onProgress);
+
+    const { data: { text } } = await worker.recognize(canvas);
+    const parsed = parseReceiptText(text);
+
+    return {
+        ...parsed,
         rawText: text
     };
 }

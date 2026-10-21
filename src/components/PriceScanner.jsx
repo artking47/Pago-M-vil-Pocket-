@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { scanPriceTag, preprocessCanvasForOCR } from '../services/ocrService';
 
-function PriceScanner({ onScan, onClose }) {
+function PriceScanner({ onScan, onClose, onOpenReceiptScanner }) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -288,6 +288,23 @@ function PriceScanner({ onScan, onClose }) {
                                 </button>
                             ))}
                         </div>
+
+                        {onOpenReceiptScanner && (
+                            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
+                                <span className="text-[11px] text-white/75">¿Es un ticket con varios artículos?</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        handleClose();
+                                        onOpenReceiptScanner();
+                                    }}
+                                    className="text-xs font-bold text-secondary flex items-center gap-1 hover:underline"
+                                >
+                                    <span className="material-symbols-outlined text-sm">receipt_long</span>
+                                    Escanear Factura Completa
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

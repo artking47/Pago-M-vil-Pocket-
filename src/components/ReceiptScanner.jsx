@@ -1,14 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { scanReceipt, compressImageForStorage } from '../services/ocrService';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { scanReceipt, parseReceiptText, compressImageForStorage } from '../services/ocrService';
 
-function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
+function ReceiptScanner({ currentItems = [], rate = 1, onComplete, onClose }) {
     const fileInputRef = useRef(null);
+    const [inputMode, setInputMode] = useState('scan'); // 'scan' | 'paste'
+    const [pastedText, setPastedText] = useState('');
     const [imagePreview, setImagePreview] = useState(null);
     const [status, setStatus] = useState('Listo para capturar el recibo');
     const [progress, setProgress] = useState(0);
     const [processing, setProcessing] = useState(false);
     const [parsedData, setParsedData] = useState(null);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [showRawText, setShowRawText] = useState(false);
 
     // Editable fields for precision correction
     const [storeName, setStoreName] = useState('');
@@ -32,6 +35,21 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onClose]);
 
+    // Apply parsed result (shared by OCR and pasted text)
+    const applyParsedResult = (result) => {
+        setStoreName(result.supermarketName || 'Supermercado');
+        setTotalVES(result.totalVES ? result.totalVES.toString() : '');
+        setTotalUSD(result.totalUSD ? result.totalUSD.toString() : '');
+        setBcvRate(result.rate ? result.rate.toString() : (rate ? rate.toString() : ''));
+        setIgtfVES(result.igtfVES ? result.igtfVES.toString() : '');
+        setIvaVES(result.ivaVES ? result.ivaVES.toString() : '');
+        setEditableItems(result.items || []);
+
+        reconcileWithCart(result.items || []);
+        setParsedData(result);
+        setStatus('¡Ticket analizado con éxito!');
+    };
+
     // Handle photo capture or gallery upload
     const handleFileSelected = async (e) => {
         const file = e.target.files?.[0];
@@ -42,42 +60,55 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
         setParsedData(null);
 
         try {
-            // Compress image for preview and local storage
-            const compressed = await compressImageForStorage(file, 1100, 0.75);
-            setImagePreview(compressed);
+            // Compress thumbnail for preview and local storage
+            const compressedThumbnail = await compressImageForStorage(file, 900, 0.7);
+            setImagePreview(compressedThumbnail);
 
-            setStatus('Analizando ticket y extrayendo artículos...');
-            const img = new Image();
-            img.src = compressed;
+            setStatus('Cargando imagen en alta resolución...');
+
+            // Load original high-resolution image for maximum OCR accuracy on thermal receipt fonts
+            const objectUrl = URL.createObjectURL(file);
+            const fullResImg = new Image();
+            fullResImg.src = objectUrl;
             await new Promise((res, rej) => {
-                img.onload = res;
-                img.onerror = rej;
+                fullResImg.onload = res;
+                fullResImg.onerror = rej;
             });
 
-            const result = await scanReceipt(img, {
+            setStatus('Analizando líneas térmicas y extrayendo artículos...');
+            const result = await scanReceipt(fullResImg, {
                 onProgress: (p) => {
                     setStatus(p.label || 'Leyendo factura...');
                     setProgress(p.progress || 0);
                 }
             });
 
-            // Populate editable fields
-            setStoreName(result.supermarketName || 'Supermercado');
-            setTotalVES(result.totalVES ? result.totalVES.toString() : '');
-            setTotalUSD(result.totalUSD ? result.totalUSD.toString() : '');
-            setBcvRate(result.rate ? result.rate.toString() : (rate ? rate.toString() : ''));
-            setIgtfVES(result.igtfVES ? result.igtfVES.toString() : '');
-            setIvaVES(result.ivaVES ? result.ivaVES.toString() : '');
-            setEditableItems(result.items || []);
-
-            // Reconcile with active shopping list
-            reconcileWithCart(result.items || []);
-
-            setParsedData(result);
-            setStatus('¡Ticket analizado con éxito!');
+            URL.revokeObjectURL(objectUrl);
+            applyParsedResult(result);
         } catch (err) {
             console.error('Receipt OCR error:', err);
-            setErrorMessage('No pudimos procesar la imagen del recibo. Asegúrate de enfocar bien y con buena luz.');
+            setErrorMessage('No pudimos procesar la imagen del recibo. Asegúrate de enfocar con buena luz y estirar el ticket, o prueba pegando el texto en la pestaña "Pegar Texto".');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    // Handle direct text paste parsing
+    const handleProcessPastedText = () => {
+        if (!pastedText.trim()) {
+            setErrorMessage('Por favor pega el texto de la factura en el recuadro antes de procesar.');
+            return;
+        }
+
+        setProcessing(true);
+        setErrorMessage(null);
+
+        try {
+            const result = parseReceiptText(pastedText);
+            applyParsedResult(result);
+        } catch (err) {
+            console.error('Paste parse error:', err);
+            setErrorMessage('Hubo un problema interpretando el texto. Verifica que contenga los montos o precios.');
         } finally {
             setProcessing(false);
         }
@@ -90,9 +121,9 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
 
         itemsList.forEach((rItem) => {
             const match = currentItems.find(cItem => {
-                const cName = cItem.name.toLowerCase().trim();
-                const rName = rItem.name.toLowerCase().trim();
-                return cName.includes(rName) || rName.includes(cName);
+                const cName = (cItem.name || '').toLowerCase().trim();
+                const rName = (rItem.name || '').toLowerCase().trim();
+                return (cName && rName && (cName.includes(rName) || rName.includes(cName)));
             });
 
             if (match) {
@@ -158,7 +189,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
         }));
     };
 
-    // Current total of shopping list
+    // Financial math
     const currentTotalUSD = currentItems.reduce((acc, it) => {
         const qty = it.quantity || 1;
         const p = it.originalCurrency === 'USD' ? it.originalPrice : (it.originalPrice / (rate || 1));
@@ -168,6 +199,15 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
     const parsedRateNum = parseFloat(bcvRate) || rate || 1;
     const finalTotalUSD = totalUSD ? parseFloat(totalUSD) : (totalVES ? parseFloat(totalVES) / parsedRateNum : null);
     const diffUSD = (finalTotalUSD && currentTotalUSD > 0) ? (finalTotalUSD - currentTotalUSD) : null;
+
+    // Items sum in VES vs detected total
+    const itemsSumVES = useMemo(() => {
+        return editableItems.reduce((acc, it) => {
+            const price = parseFloat(it.price) || 0;
+            const qty = parseFloat(it.quantity) || 1;
+            return acc + (price * qty);
+        }, 0);
+    }, [editableItems]);
 
     // Apply reconciliation and finish
     const handleApplyAndFinish = () => {
@@ -209,8 +249,8 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
             invoiceNumber: parsedData?.invoiceNumber || '',
             invoiceDate: parsedData?.invoiceDate || new Date().toLocaleDateString('es-VE'),
             rate: parsedRateNum,
-            totalVES: parseFloat(totalVES) || (finalTotalUSD ? finalTotalUSD * parsedRateNum : 0),
-            totalUSD: finalTotalUSD || 0,
+            totalVES: parseFloat(totalVES) || (finalTotalUSD ? finalTotalUSD * parsedRateNum : itemsSumVES),
+            totalUSD: finalTotalUSD || (parsedRateNum > 0 ? itemsSumVES / parsedRateNum : 0),
             ivaVES: parseFloat(ivaVES) || 0,
             igtfVES: parseFloat(igtfVES) || 0,
             items: editableItems
@@ -220,7 +260,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
             receiptImage: imagePreview,
             receiptData: compiledReceiptData,
             updatedItems,
-            receiptTotalUSD: finalTotalUSD,
+            receiptTotalUSD: compiledReceiptData.totalUSD,
             receiptTotalVES: compiledReceiptData.totalVES
         });
     };
@@ -264,39 +304,104 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
 
             {/* MAIN CONTENT AREA */}
             <div className="flex-1 overflow-y-auto p-4 max-w-lg mx-auto w-full space-y-4 pb-32">
-                {/* Intro / Instructions Card */}
+                {/* Intro & Mode Selector (Only when not parsed yet) */}
                 {!parsedData && !processing && (
-                    <div className="card-glass p-6 text-center space-y-4 animate-fade-in-up">
-                        <div className="w-16 h-16 rounded-2xl bg-primary/20 text-primary flex items-center justify-center mx-auto shadow-inner">
-                            <span className="material-symbols-outlined text-3xl">receipt_long</span>
-                        </div>
-                        <div>
-                            <h4 className="text-on-surface font-bold text-lg">Escanea tu Ticket de Compra</h4>
-                            <p className="text-outline text-xs mt-1 leading-relaxed">
-                                Toma una foto nítida de la factura fiscal. La IA extraerá los artículos, impuestos (IVA / IGTF 3%), tasa BCV y te permitirá corregir cualquier detalle antes de agregar los productos faltantes a tu lista.
-                            </p>
-                        </div>
-
-                        {/* Capture Buttons */}
-                        <div className="pt-2 flex flex-col gap-2.5">
+                    <div className="space-y-4 animate-fade-in-up">
+                        {/* Mode Switcher Pills */}
+                        <div className="p-1 rounded-2xl well flex gap-1">
                             <button
                                 type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="h-13 py-3.5 px-4 rounded-[20px] thumb-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/25 active:scale-95 transition-all"
+                                onClick={() => setInputMode('scan')}
+                                className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                                    inputMode === 'scan' ? 'thumb-primary' : 'text-outline hover:text-on-surface'
+                                }`}
                             >
-                                <span className="material-symbols-outlined text-xl">photo_camera</span>
-                                Tomar foto del recibo (Cámara)
+                                <span className="material-symbols-outlined text-base">photo_camera</span>
+                                <span>Cámara / Foto</span>
                             </button>
-
                             <button
                                 type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="h-11 px-4 rounded-[16px] well text-on-surface-variant font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95"
+                                onClick={() => setInputMode('paste')}
+                                className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                                    inputMode === 'paste' ? 'thumb-primary' : 'text-outline hover:text-on-surface'
+                                }`}
                             >
-                                <span className="material-symbols-outlined text-base">image</span>
-                                Subir foto desde la galería
+                                <span className="material-symbols-outlined text-base">content_paste</span>
+                                <span>Pegar Texto</span>
                             </button>
                         </div>
+
+                        {/* MODE 1: CAMERA / PHOTO */}
+                        {inputMode === 'scan' && (
+                            <div className="card-glass p-6 text-center space-y-4">
+                                <div className="w-16 h-16 rounded-2xl bg-primary/20 text-primary flex items-center justify-center mx-auto shadow-inner">
+                                    <span className="material-symbols-outlined text-3xl">receipt_long</span>
+                                </div>
+                                <div>
+                                    <h4 className="text-on-surface font-bold text-lg">Escanea tu Ticket Fiscal</h4>
+                                    <p className="text-outline text-xs mt-1 leading-relaxed">
+                                        Fotografía la factura en una superficie plana y con buena luz. La IA extraerá cada artículo, cantidad, precio unitario, IVA, IGTF 3% y tasa oficial BCV.
+                                    </p>
+                                </div>
+
+                                <div className="pt-2 flex flex-col gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="h-13 py-3.5 px-4 rounded-[20px] thumb-primary font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/25 active:scale-95 transition-all"
+                                    >
+                                        <span className="material-symbols-outlined text-xl">photo_camera</span>
+                                        Tomar foto del recibo (Cámara)
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="h-11 px-4 rounded-[16px] well text-on-surface font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95"
+                                    >
+                                        <span className="material-symbols-outlined text-base">image</span>
+                                        Subir foto desde la galería
+                                    </button>
+                                </div>
+
+                                <p className="text-[10px] text-outline pt-1">
+                                    Tip: Compatible con impresoras térmicas SENIAT (The Factory HKA, Bixolon, Dascom, etc.)
+                                </p>
+                            </div>
+                        )}
+
+                        {/* MODE 2: PASTE TEXT (WHATSAPP, DIGITAL INVOICE, PDF) */}
+                        {inputMode === 'paste' && (
+                            <div className="card-glass p-5 space-y-3">
+                                <div>
+                                    <h4 className="text-on-surface font-bold text-sm flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-primary text-base">content_paste</span>
+                                        Pegar Texto de Factura o Recibo
+                                    </h4>
+                                    <p className="text-outline text-xs mt-0.5">
+                                        Ideal si recibiste el ticket por WhatsApp, correo o copia digital.
+                                    </p>
+                                </div>
+
+                                <textarea
+                                    rows={8}
+                                    value={pastedText}
+                                    onChange={(e) => setPastedText(e.target.value)}
+                                    placeholder="Pega aquí el texto del ticket. Ejemplo:&#10;AUTOMERCADOS PLAZA&#10;001 HARINA PAN 1KG 48,50&#10;002 ARROZ PRIMOR 2 X 52,00 104,00&#10;TOTAL: 152,50&#10;TASA BCV: 86.88"
+                                    className="w-full well rounded-2xl p-3 text-xs font-mono text-on-surface outline-none focus:border-primary/50 resize-y"
+                                />
+
+                                <button
+                                    type="button"
+                                    onClick={handleProcessPastedText}
+                                    disabled={!pastedText.trim()}
+                                    className="w-full h-12 rounded-2xl thumb-primary font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                                >
+                                    <span className="material-symbols-outlined text-base">auto_awesome</span>
+                                    Analizar y Extraer Artículos
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -308,12 +413,12 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                         </div>
                         <div>
                             <h4 className="text-on-surface font-bold text-base">{status}</h4>
-                            <p className="text-outline text-xs mt-1">Leyendo líneas térmicas, precios y tasas...</p>
+                            <p className="text-outline text-xs mt-1">Reconociendo nombres de productos, columnas y precios...</p>
                         </div>
                         {progress > 0 && (
                             <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden mt-3">
                                 <div 
-                                    className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-300"
+                                    className="h-full bg-primary transition-all duration-300"
                                     style={{ width: `${progress}%` }}
                                 />
                             </div>
@@ -331,15 +436,24 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                     <div className="bg-error/15 border border-error/30 p-4 rounded-2xl flex items-start gap-3 text-left">
                         <span className="material-symbols-outlined text-error text-xl shrink-0">error</span>
                         <div className="flex-1 text-xs">
-                            <p className="font-bold text-on-surface mb-1">Error al procesar el ticket</p>
+                            <p className="font-bold text-on-surface mb-1">Nota del Escáner</p>
                             <p className="text-outline">{errorMessage}</p>
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="mt-3 px-3 py-1.5 rounded-full bg-error/20 text-error font-bold flex items-center gap-1 active:scale-95"
-                            >
-                                <span className="material-symbols-outlined text-sm">refresh</span> Reintentar
-                            </button>
+                            <div className="flex gap-2 mt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="px-3 py-1.5 rounded-full bg-error/20 text-error font-bold flex items-center gap-1 active:scale-95"
+                                >
+                                    <span className="material-symbols-outlined text-sm">photo_camera</span> Reintentar Foto
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setErrorMessage(null); setInputMode('paste'); }}
+                                    className="px-3 py-1.5 rounded-full well text-on-surface font-bold flex items-center gap-1 active:scale-95"
+                                >
+                                    <span className="material-symbols-outlined text-sm">content_paste</span> Pegar Texto
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -375,7 +489,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                         onClick={() => fileInputRef.current?.click()}
                                         className="text-primary text-xs font-bold flex items-center gap-1 shrink-0"
                                     >
-                                        <span className="material-symbols-outlined text-sm">cached</span> Cambiar foto
+                                        <span className="material-symbols-outlined text-sm">cached</span> Repetir foto
                                     </button>
                                 </div>
 
@@ -396,7 +510,8 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                                 step="0.01"
                                                 value={finalTotalUSD || ''}
                                                 onChange={(e) => setTotalUSD(e.target.value)}
-                                                className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none text-primary font-bold text-lg"
+                                                placeholder="0.00"
+                                                className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none text-primary font-bold text-lg font-mono"
                                             />
                                         </div>
                                     </div>
@@ -429,18 +544,18 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                                 value={bcvRate}
                                                 onChange={(e) => setBcvRate(e.target.value)}
                                                 placeholder="0.00"
-                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none"
+                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none font-mono"
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-tertiary font-bold">IGTF 3% (Divisas Bs):</label>
+                                            <label className="text-[10px] text-outline">Total Ticket (Bs):</label>
                                             <input 
                                                 type="number"
                                                 step="0.01"
-                                                value={igtfVES}
-                                                onChange={(e) => setIgtfVES(e.target.value)}
+                                                value={totalVES}
+                                                onChange={(e) => setTotalVES(e.target.value)}
                                                 placeholder="0.00"
-                                                className="w-full well rounded-xl px-2.5 py-1.5 text-tertiary font-bold text-xs mt-0.5 outline-none"
+                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none font-mono"
                                             />
                                         </div>
                                     </div>
@@ -454,18 +569,18 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                                 value={ivaVES}
                                                 onChange={(e) => setIvaVES(e.target.value)}
                                                 placeholder="0.00"
-                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none"
+                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none font-mono"
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-outline">Total Ticket (Bs):</label>
+                                            <label className="text-[10px] text-outline">IGTF 3% (Divisas Bs):</label>
                                             <input 
                                                 type="number"
                                                 step="0.01"
-                                                value={totalVES}
-                                                onChange={(e) => setTotalVES(e.target.value)}
+                                                value={igtfVES}
+                                                onChange={(e) => setIgtfVES(e.target.value)}
                                                 placeholder="0.00"
-                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none"
+                                                className="w-full well rounded-xl px-2.5 py-1.5 text-on-surface font-semibold text-xs mt-0.5 outline-none font-mono"
                                             />
                                         </div>
                                     </div>
@@ -481,89 +596,115 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                         <span className="material-symbols-outlined text-primary text-base">format_list_bulleted</span>
                                         Artículos Detectados ({editableItems.length})
                                     </p>
-                                    <p className="text-outline text-[11px]">Toca cualquier nombre o precio para corregir imprecisiones</p>
+                                    <p className="text-outline text-[11px]">
+                                        Suma de artículos: <strong className="text-on-surface font-mono">Bs. {itemsSumVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                                        {totalVES && Math.abs(parseFloat(totalVES) - itemsSumVES) < 1 && (
+                                            <span className="text-emerald-500 font-bold ml-1.5">✓ Coincide con total</span>
+                                        )}
+                                    </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={handleAddManualItem}
-                                    className="text-xs text-primary font-bold flex items-center gap-1 hover:underline"
+                                    className="text-xs text-primary font-bold flex items-center gap-1 hover:underline shrink-0"
                                 >
                                     <span className="material-symbols-outlined text-sm">add</span> Añadir
                                 </button>
                             </div>
 
-                            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                                {editableItems.map((item) => {
-                                    const isNew = selectedNewItems[item.id];
-                                    return (
-                                        <div 
-                                            key={item.id}
-                                            className={`p-2.5 rounded-xl border flex items-center gap-2 ${isNew?.selected ? 'bg-primary/10 border-primary/30' : 'well border-transparent'}`}
-                                        >
-                                            {/* Checkbox to add to cart if it was missing */}
-                                            {isNew && (
-                                                <input 
-                                                    type="checkbox"
-                                                    checked={!!isNew.selected}
-                                                    onChange={(e) => {
-                                                        setSelectedNewItems(prev => ({
-                                                            ...prev,
-                                                            [item.id]: { ...prev[item.id], selected: e.target.checked }
-                                                        }));
-                                                    }}
-                                                    title="Marcar para agregar al carrito"
-                                                    className="w-4 h-4 rounded text-primary focus:ring-0 bg-transparent border-white/20 shrink-0"
-                                                />
-                                            )}
-
-                                            {/* Name Input */}
-                                            <div className="flex-1 min-w-0">
-                                                <input 
-                                                    type="text"
-                                                    value={item.name}
-                                                    onChange={(e) => handleItemFieldChange(item.id, 'name', e.target.value)}
-                                                    className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none text-on-surface font-semibold text-xs truncate"
-                                                />
-                                                <div className="flex items-center gap-1.5 text-[10px] text-outline mt-0.5">
-                                                    <span>Cant:</span>
-                                                    <input 
-                                                        type="number"
-                                                        min="1"
-                                                        value={item.quantity || 1}
-                                                        onChange={(e) => handleItemFieldChange(item.id, 'quantity', parseInt(e.target.value, 10) || 1)}
-                                                        className="w-8 bg-white/10 rounded px-1 py-0.5 text-center text-on-surface font-bold outline-none"
-                                                    />
-                                                    {isNew && (
-                                                        <span className="text-secondary font-bold ml-1">• No estaba en lista</span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Price Input */}
-                                            <div className="w-20 text-right shrink-0">
-                                                <input 
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={item.price || ''}
-                                                    onChange={(e) => handleItemFieldChange(item.id, 'price', e.target.value)}
-                                                    placeholder="0.00"
-                                                    className="w-full bg-white/10 rounded-lg px-2 py-1 text-right text-primary font-bold text-xs outline-none"
-                                                />
-                                            </div>
-
-                                            {/* Delete Item */}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteItem(item.id)}
-                                                className="w-7 h-7 rounded-full well flex items-center justify-center text-outline hover:text-error shrink-0"
-                                                title="Eliminar este artículo"
+                            {/* Fallback if 0 items detected */}
+                            {editableItems.length === 0 ? (
+                                <div className="p-4 rounded-xl well border border-dashed border-white/15 text-center space-y-2">
+                                    <span className="material-symbols-outlined text-2xl text-outline">find_in_page</span>
+                                    <p className="text-xs font-semibold text-on-surface">No se identificaron artículos individuales automáticamente</p>
+                                    <p className="text-[11px] text-outline max-w-xs mx-auto">
+                                        La tinta térmica tenue o dobleces del papel pueden dificultar la lectura. Puedes agregar tus artículos con el botón (+ Añadir) o pegar el texto directamente.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={handleAddManualItem}
+                                        className="h-9 px-4 rounded-full thumb-primary font-bold text-xs inline-flex items-center gap-1 active:scale-95"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">add</span> Añadir primer artículo
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                                    {editableItems.map((item) => {
+                                        const isNew = selectedNewItems[item.id];
+                                        return (
+                                            <div 
+                                                key={item.id}
+                                                className={`p-2.5 rounded-xl border flex items-center gap-2 ${isNew?.selected ? 'bg-primary/5 border-primary/25' : 'well border-transparent'}`}
                                             >
-                                                <span className="material-symbols-outlined text-xs">close</span>
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                                {/* Checkbox to add to cart if it was missing */}
+                                                {isNew && (
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={!!isNew.selected}
+                                                        onChange={(e) => {
+                                                            setSelectedNewItems(prev => ({
+                                                                ...prev,
+                                                                [item.id]: { ...prev[item.id], selected: e.target.checked }
+                                                            }));
+                                                        }}
+                                                        title="Marcar para agregar al carrito"
+                                                        className="w-4 h-4 rounded text-primary focus:ring-0 bg-transparent border-white/20 shrink-0 cursor-pointer"
+                                                    />
+                                                )}
+
+                                                {/* Name Input */}
+                                                <div className="flex-1 min-w-0">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.name}
+                                                        onChange={(e) => handleItemFieldChange(item.id, 'name', e.target.value)}
+                                                        className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none text-on-surface font-semibold text-xs truncate"
+                                                    />
+                                                    <div className="flex items-center gap-1.5 text-[10px] text-outline mt-0.5">
+                                                        <span>Cant:</span>
+                                                        <input 
+                                                            type="number" 
+                                                            min="1"
+                                                            value={item.quantity || 1}
+                                                            onChange={(e) => handleItemFieldChange(item.id, 'quantity', parseInt(e.target.value, 10) || 1)}
+                                                            className="w-8 well rounded px-1 py-0.5 text-center text-on-surface font-bold outline-none font-mono"
+                                                        />
+                                                        {isNew && (
+                                                            <span className="text-secondary font-bold ml-1">• Nuevo en lista</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Price Input */}
+                                                <div className="w-24 text-right shrink-0">
+                                                    <div className="flex items-center gap-1 well rounded-lg px-2 py-1">
+                                                        <span className="text-[10px] text-outline font-bold">Bs</span>
+                                                        <input 
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={item.price || ''}
+                                                            onChange={(e) => handleItemFieldChange(item.id, 'price', e.target.value)}
+                                                            placeholder="0.00"
+                                                            className="w-full bg-transparent border-none p-0 text-right text-on-surface font-bold text-xs outline-none font-mono"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Delete Item */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteItem(item.id)}
+                                                    className="w-7 h-7 rounded-full well flex items-center justify-center text-outline hover:text-error shrink-0 active:scale-90"
+                                                    title="Eliminar este artículo"
+                                                >
+                                                    <span className="material-symbols-outlined text-xs">close</span>
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
                         {/* RECONCILIATION SUMMARY BOX: Artículos que se pasaron añadir */}
@@ -572,10 +713,10 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                 <div className="min-w-0 pr-2">
                                     <p className="text-secondary font-bold text-xs flex items-center gap-1">
                                         <span className="material-symbols-outlined text-sm">playlist_add</span>
-                                        {Object.values(selectedNewItems).filter(i => i.selected).length} artículos faltantes seleccionados
+                                        {Object.values(selectedNewItems).filter(i => i.selected).length} artículos a sincronizar
                                     </p>
                                     <p className="text-outline text-[11px] mt-0.5">
-                                        Se agregarán automáticamente a tu carrito activo al finalizar.
+                                        Se agregarán automáticamente a tu carrito activo al confirmar.
                                     </p>
                                 </div>
                                 <button
@@ -588,10 +729,31 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                                         });
                                         setSelectedNewItems(updated);
                                     }}
-                                    className="text-xs text-secondary font-bold underline shrink-0"
+                                    className="text-xs text-secondary font-bold underline shrink-0 cursor-pointer"
                                 >
                                     {Object.values(selectedNewItems).every(i => i.selected) ? 'Desmarcar' : 'Marcar todos'}
                                 </button>
+                            </div>
+                        )}
+
+                        {/* Raw text inspected accordion */}
+                        {parsedData.rawText && (
+                            <div className="pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRawText(!showRawText)}
+                                    className="text-[11px] text-outline font-semibold flex items-center gap-1 hover:text-on-surface"
+                                >
+                                    <span className="material-symbols-outlined text-xs">
+                                        {showRawText ? 'expand_less' : 'expand_more'}
+                                    </span>
+                                    {showRawText ? 'Ocultar texto detectado del ticket' : 'Ver texto detectado del ticket (OCR)'}
+                                </button>
+                                {showRawText && (
+                                    <pre className="mt-2 p-3 rounded-xl well text-[10px] font-mono text-outline whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                        {parsedData.rawText}
+                                    </pre>
+                                )}
                             </div>
                         )}
                     </div>
@@ -614,7 +776,7 @@ function ReceiptScanner({ currentItems, rate, onComplete, onClose }) {
                     <button
                         type="button"
                         onClick={handleApplyAndFinish}
-                        className="h-12 px-5 rounded-[16px] thumb-primary text-white font-bold text-sm flex-[2] flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-primary/25"
+                        className="h-12 px-5 rounded-[16px] thumb-primary font-bold text-sm flex-[2] flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-primary/25"
                     >
                         <span className="material-symbols-outlined text-lg">check_circle</span>
                         Aplicar y Sincronizar Carrito

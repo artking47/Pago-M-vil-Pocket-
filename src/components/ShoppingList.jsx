@@ -300,6 +300,28 @@ function ShoppingList({ onGoToFinance }) {
                         </div>
                     )}
 
+                    {/* Quick Scanner Shortcuts */}
+                    <div className="flex gap-2 mb-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowReceiptScanner(true)}
+                            className="flex-1 h-11 px-3 rounded-2xl well border border-secondary/35 text-on-surface hover:border-secondary/60 flex items-center justify-center gap-2 active:scale-95 transition-all text-xs font-bold"
+                            title="Escanear factura o recibo completo"
+                        >
+                            <span className="material-symbols-outlined text-secondary text-base">receipt_long</span>
+                            <span>Escanear Factura / Ticket</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowScanner(true)}
+                            className="h-11 px-3.5 rounded-2xl well text-outline hover:text-on-surface flex items-center justify-center gap-1.5 active:scale-95 transition-all text-xs font-semibold"
+                            title="Escanear precio de una etiqueta de estante o góndola"
+                        >
+                            <span className="material-symbols-outlined text-primary text-base">label</span>
+                            <span>Etiqueta</span>
+                        </button>
+                    </div>
+
                     {/* Input Form Card */}
                     <div className="bezel mb-6">
                 <form onSubmit={handleAddItem} className="bezel-core card-sheen p-4 sm:p-5 space-y-3">
@@ -543,9 +565,27 @@ function ShoppingList({ onGoToFinance }) {
                         <span className="material-symbols-outlined text-3xl opacity-50">shopping_cart</span>
                     </div>
                     <h3 className="text-on-surface font-bold text-base">Tu lista de compras está vacía</h3>
-                    <p className="text-xs text-outline mt-1 max-w-xs">
-                        Agrega productos con el teclado o usa el botón de escáner para leer precios directamente de las etiquetas.
+                    <p className="text-xs text-outline mt-1 max-w-xs mb-5">
+                        Agrega productos con el teclado, escanea una factura completa o lee precios individuales con la cámara.
                     </p>
+                    <div className="flex flex-col sm:flex-row gap-2.5 w-full max-w-xs">
+                        <button
+                            type="button"
+                            onClick={() => setShowReceiptScanner(true)}
+                            className="press h-11 px-4 rounded-xl thumb-primary text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md w-full"
+                        >
+                            <span className="material-symbols-outlined text-base">receipt_long</span>
+                            Escanear Factura / Ticket
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowScanner(true)}
+                            className="press h-11 px-4 rounded-xl well border border-white/10 text-on-surface font-semibold text-xs flex items-center justify-center gap-2 w-full hover:border-primary/40"
+                        >
+                            <span className="material-symbols-outlined text-base">qr_code_scanner</span>
+                            Escanear Etiqueta
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
@@ -615,6 +655,7 @@ function ShoppingList({ onGoToFinance }) {
                     <PriceScanner 
                         onScan={handleScanPrice}
                         onClose={() => setShowScanner(false)}
+                        onOpenReceiptScanner={() => setShowReceiptScanner(true)}
                     />
                 </Suspense>
             )}
